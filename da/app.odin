@@ -1,4 +1,4 @@
-package main
+package da
 
 import "base:runtime"
 import clay "clay-odin"
@@ -8,9 +8,13 @@ import "vendor:raylib"
 windowWidth: i32 = 1024
 windowHeight: i32 = 768
 
+run: bool = true
 animationLerpValue: f32 = -1.0
 
-FONT_ID_TITLE_56 :: 0
+FONT_ID_TITLE_16 :: 3
+FONT_ID_TITLE_24 :: 0
+FONT_ID_TITLE_32 :: 1
+FONT_ID_TITLE_56 :: 2
 
 loadFont :: proc(fontId: u16, fontSize: u16, path: cstring) {
 	assign_at(
@@ -43,12 +47,23 @@ init :: proc() {
 	raylib.InitWindow(windowWidth, windowHeight, "Raylib Odin Example")
 	raylib.SetTargetFPS(raylib.GetMonitorRefreshRate(0))
 
+	loadFont(FONT_ID_TITLE_16, 16, "assets/iosevka.ttf")
+	loadFont(FONT_ID_TITLE_24, 24, "assets/iosevka.ttf")
+	loadFont(FONT_ID_TITLE_32, 32, "assets/iosevka.ttf")
 	loadFont(FONT_ID_TITLE_56, 56, "assets/iosevka.ttf")
 }
 
 should_run :: proc() -> bool {
-	return !raylib.WindowShouldClose()
+	when ODIN_OS != .JS {
+		// Never run this proc in browser. It contains a 16 ms sleep on web!
+		if raylib.WindowShouldClose() {
+			run = false
+		}
+	}
+
+	return run
 }
+
 
 debugModeEnabled := false
 
@@ -83,102 +98,4 @@ shutdown :: proc() {}
 
 parent_window_size_changed :: proc(w, h: int) {
 	raylib.SetWindowSize(c.int(w), c.int(h))
-}
-
-
-// Define some colors.
-COLOR_LIGHT :: clay.Color{224, 215, 210, 255}
-COLOR_RED :: clay.Color{168, 66, 28, 255}
-COLOR_ORANGE :: clay.Color{225, 138, 50, 255}
-COLOR_BLACK :: clay.Color{0, 0, 0, 255}
-
-// Layout config is just a struct that can be declared statically, or inline
-sidebar_item_layout := clay.LayoutConfig {
-	sizing = {width = clay.SizingGrow({}), height = clay.SizingFixed(50)},
-}
-
-// Re-useable components are just normal procs.
-sidebar_item_component :: proc(index: u32) {
-	if clay.UI()(
-	{
-		id = clay.ID("SidebarBlob", index),
-		layout = sidebar_item_layout,
-		backgroundColor = COLOR_ORANGE,
-	},
-	) {}
-}
-
-createLayout :: proc(lerpValue: f32) -> clay.ClayArray(clay.RenderCommand) {
-	clay.BeginLayout()
-	// An example of laying out a UI with a fixed-width sidebar and flexible-width main content
-	// NOTE: To create a scope for child components, the Odin API uses `if` with components that have children
-	if clay.UI()(
-	{
-		id = clay.ID("OuterContainer"),
-		layout = {
-			sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})},
-			padding = {16, 16, 16, 16},
-			childGap = 16,
-		},
-		backgroundColor = {250, 250, 255, 255},
-	},
-	) {
-		if clay.UI()(
-		{
-			id = clay.ID("SideBar"),
-			layout = {
-				layoutDirection = .TopToBottom,
-				sizing = {width = clay.SizingFixed(300), height = clay.SizingGrow({})},
-				padding = {16, 16, 16, 16},
-				childGap = 16,
-			},
-			backgroundColor = COLOR_LIGHT,
-		},
-		) {
-			if clay.UI()(
-			{
-				id = clay.ID("ProfilePictureOuter"),
-				layout = {
-					sizing = {width = clay.SizingGrow({})},
-					padding = {16, 16, 16, 16},
-					childGap = 16,
-					childAlignment = {y = .Center},
-				},
-				backgroundColor = COLOR_RED,
-				cornerRadius = {6, 6, 6, 6},
-			},
-			) {
-				if clay.UI()(
-				{
-					id = clay.ID("ProfilePicture"),
-					layout = {
-						sizing = {width = clay.SizingFixed(60), height = clay.SizingFixed(60)},
-					},
-				},
-				) {}
-
-				clay.Text(
-					"Clay - UI Library",
-					clay.TextConfig(
-						{textColor = COLOR_BLACK, fontSize = 52, fontId = FONT_ID_TITLE_56},
-					),
-				)
-			}
-
-			// Standard Odin code like loops, etc. work inside components.
-			// Here we render 5 sidebar items.
-			for i in u32(0) ..< 5 {
-				sidebar_item_component(i)
-			}
-		}
-
-		if clay.UI()(
-		{
-			id = clay.ID("MainContent"),
-			layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})}},
-			backgroundColor = COLOR_LIGHT,
-		},
-		) {}
-	}
-	return clay.EndLayout()
 }

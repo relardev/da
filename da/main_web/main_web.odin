@@ -6,6 +6,7 @@ package main_web
 import app ".."
 import "base:runtime"
 import "core:c"
+import "core:log"
 import "core:mem"
 
 @(private = "file")
@@ -47,6 +48,6 @@ main_end :: proc "c" () {
 @(export)
 web_window_size_changed :: proc "c" (w: c.int, h: c.int) {
 	context = web_context
+	log.debugf("web_window_size_changed: %d x %d", w, h)
 	app.parent_window_size_changed(int(w), int(h))
 }
-

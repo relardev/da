@@ -1,4 +1,4 @@
-package main
+package da
 
 import clay "clay-odin"
 import "core:math"
