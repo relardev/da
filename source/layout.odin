@@ -1,4 +1,4 @@
-package da
+package game
 
 import clay "clay-odin"
 // Define some colors.
@@ -61,7 +61,7 @@ button_component :: proc(id: clay.ElementId, $text: string) {
 	}
 }
 
-createLayout :: proc(lerpValue: f32) -> clay.ClayArray(clay.RenderCommand) {
+create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
 	clay.BeginLayout()
 	// An example of laying out a UI with a fixed-width sidebar and flexible-width main content
 	// NOTE: To create a scope for child components, the Odin API uses `if` with components that have children

@@ -1,43 +1,12 @@
-package da
+package game
 
 import clay "clay-odin"
 import "core:math"
 import "core:strings"
 import rl "vendor:raylib"
 
-Raylib_Font :: struct {
-	fontId: u16,
-	font:   rl.Font,
-}
-
 clay_color_to_rl_color :: proc(color: clay.Color) -> rl.Color {
 	return {u8(color.r), u8(color.g), u8(color.b), u8(color.a)}
-}
-
-raylib_fonts := [dynamic]Raylib_Font{}
-
-measure_text :: proc "c" (
-	text: clay.StringSlice,
-	config: ^clay.TextElementConfig,
-	userData: rawptr,
-) -> clay.Dimensions {
-	line_width: f32 = 0
-
-	font := raylib_fonts[config.fontId].font
-
-	for i in 0 ..< text.length {
-		glyph_index := text.chars[i] - 32
-
-		glyph := font.glyphs[glyph_index]
-
-		if glyph.advanceX != 0 {
-			line_width += f32(glyph.advanceX)
-		} else {
-			line_width += font.recs[glyph_index].width + f32(glyph.offsetX)
-		}
-	}
-
-	return {width = line_width / 2, height = f32(config.fontSize)}
 }
 
 clay_raylib_render :: proc(
@@ -59,7 +28,7 @@ clay_raylib_render :: proc(
 			// Assume this will be freed elsewhere since we default to the temp allocator
 			cstr_text := strings.clone_to_cstring(text, allocator)
 
-			font := raylib_fonts[config.fontId].font
+			font := g.raylib_fonts[config.fontId].font
 			rl.DrawTextEx(
 				font,
 				cstr_text,
