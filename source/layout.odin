@@ -13,7 +13,6 @@ sidebar_item_layout := clay.LayoutConfig {
 	padding = {8, 8, 0, 0},
 }
 
-
 block_type :: enum {
 	Trigger,
 	Conditions,
@@ -57,6 +56,31 @@ button_component :: proc(id: clay.ElementId, $text: string) {
 		clay.Text(
 			text,
 			clay.TextConfig({textColor = COLOR_BLACK, fontSize = 16, fontId = FONT_ID_TITLE_16}),
+		)
+	}
+}
+
+layout_node_component :: proc(id: u32, offset: Vec2) {
+	if clay.UI()(
+	{
+		id = clay.ID("Node", id),
+		backgroundColor = COLOR_RED,
+		floating = {
+			clipTo = .AttachedParent,
+			attachTo = .Parent,
+			offset = g.graph_drawing_offset + offset,
+		},
+		layout = {
+			sizing = {
+				width = {type = .Fixed, constraints = {sizeMinMax = {min = 300}}},
+				height = {type = .Fixed, constraints = {sizeMinMax = {min = 400}}},
+			},
+		},
+	},
+	) {
+		clay.Text(
+			"Node",
+			clay.TextConfig({textColor = COLOR_BLACK, fontSize = 24, fontId = FONT_ID_TITLE_24}),
 		)
 	}
 }
@@ -144,13 +168,18 @@ create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
 			},
 		},
 		) {
+			g.graph_editor_id = clay.ID("GraphEditor")
 			if clay.UI()(
 			{
-				id = clay.ID("MainContent"),
+				id = g.graph_editor_id,
 				layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})}},
+				clip = {horizontal = true, vertical = true},
 				backgroundColor = COLOR_LIGHT,
 			},
-			) {}
+			) {
+				layout_node_component(0, {0, 0})
+				layout_node_component(1, {500, 500})
+			}
 			if clay.UI()(
 			{
 				id = clay.ID("Blocks"),

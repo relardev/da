@@ -6,18 +6,24 @@ import rl "vendor:raylib"
 
 PIXEL_WINDOW_HEIGHT :: 180
 
+Vec2 :: [2]f32
+Vec2i :: [2]i32
+
 Game_Memory :: struct {
-	run:             bool,
-	clay_debug_mode: bool,
-	clay_memory:     rawptr, // Pointer to the clay memory allocator.
-	clay_arena:      clay.Arena, // Arena for clay memory allocations.
-	raylib_fonts:    [dynamic]Raylib_Font,
+	run:                  bool,
+	clay_debug_mode:      bool,
+	clay_memory:          rawptr, // Pointer to the clay memory allocator.
+	clay_arena:           clay.Arena, // Arena for clay memory allocations.
+	raylib_fonts:         [dynamic]Raylib_Font,
+	graph_drawing_offset: Vec2,
+	graph_editor_id:      clay.ElementId,
+	prev_mouse_pos:       Vec2,
 }
 
 g: ^Game_Memory
 
 update :: proc() {
-	if (rl.IsKeyPressed(.D)) {
+	if rl.IsKeyPressed(.D) {
 		g.clay_debug_mode = !g.clay_debug_mode
 		clay.SetDebugModeEnabled(g.clay_debug_mode)
 	}
@@ -26,15 +32,23 @@ update :: proc() {
 		g.run = false
 	}
 
+	mouse_pos := rl.GetMousePosition()
+	if clay.PointerOver(g.graph_editor_id) && rl.IsMouseButtonDown(.LEFT) {
+		delta := g.prev_mouse_pos - mouse_pos
+		g.graph_drawing_offset -= delta
+	}
+	g.prev_mouse_pos = mouse_pos
+
 	clay.SetPointerState(rl.GetMousePosition(), rl.IsMouseButtonDown(rl.MouseButton.LEFT))
 	clay.UpdateScrollContainers(false, rl.GetMouseWheelMoveV(), rl.GetFrameTime())
 	clay.SetLayoutDimensions({cast(f32)rl.GetScreenWidth(), cast(f32)rl.GetScreenHeight()})
 }
 
 draw :: proc() {
-	renderCommands: clay.ClayArray(clay.RenderCommand) = create_layout()
+	render_commands: clay.ClayArray(clay.RenderCommand) = create_layout()
 	rl.BeginDrawing()
-	clay_raylib_render(&renderCommands)
+	clay_raylib_render(&render_commands)
+	rl.DrawFPS(10, 10)
 	rl.EndDrawing()
 }
 
@@ -52,6 +66,7 @@ game_init_window :: proc() {
 	rl.SetConfigFlags({.VSYNC_HINT, .WINDOW_RESIZABLE, .MSAA_4X_HINT})
 	rl.InitWindow(1024, 768, "Odin")
 	rl.SetTargetFPS(rl.GetMonitorRefreshRate(0))
+	rl.SetTargetFPS(10)
 	rl.SetExitKey(nil)
 }
 
