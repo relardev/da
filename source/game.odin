@@ -2,6 +2,7 @@ package game
 
 import "base:runtime"
 import clay "clay-odin"
+import hm "handle_map"
 import rl "vendor:raylib"
 
 PIXEL_WINDOW_HEIGHT :: 180
@@ -18,6 +19,7 @@ Game_Memory :: struct {
 	graph_drawing_offset: Vec2,
 	graph_editor_id:      clay.ElementId,
 	prev_mouse_pos:       Vec2,
+	graph:                Graph,
 }
 
 g: ^Game_Memory
@@ -91,6 +93,8 @@ game_init :: proc() {
 		),
 		raylib_fonts = make([dynamic]Raylib_Font, 10),
 	}
+
+	hm.add(&g.graph.nodes, Node{text = "Node 54", position = {100, 100}})
 
 	loadFont(FONT_ID_TITLE_16, 16, "assets/iosevka.ttf")
 	loadFont(FONT_ID_TITLE_24, 24, "assets/iosevka.ttf")

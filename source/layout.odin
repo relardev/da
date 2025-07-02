@@ -1,6 +1,8 @@
 package game
 
 import clay "clay-odin"
+import hm "handle_map"
+
 // Define some colors.
 COLOR_LIGHT :: clay.Color{224, 215, 210, 255}
 COLOR_RED :: clay.Color{168, 66, 28, 255}
@@ -60,26 +62,26 @@ button_component :: proc(id: clay.ElementId, $text: string) {
 	}
 }
 
-layout_node_component :: proc(id: u32, offset: Vec2) {
+layout_node_component :: proc(node: ^Node) {
 	if clay.UI()(
 	{
-		id = clay.ID("Node", id),
+		id = clay.ID("Node", node.handle.idx),
 		backgroundColor = COLOR_RED,
 		floating = {
 			clipTo = .AttachedParent,
 			attachTo = .Parent,
-			offset = g.graph_drawing_offset + offset,
+			offset = g.graph_drawing_offset + node.position,
 		},
 		layout = {
 			sizing = {
-				width = {type = .Fixed, constraints = {sizeMinMax = {min = 300}}},
-				height = {type = .Fixed, constraints = {sizeMinMax = {min = 400}}},
+				width = {type = .Fixed, constraints = {sizeMinMax = {min = node.width}}},
+				height = {type = .Fixed, constraints = {sizeMinMax = {min = node.height}}},
 			},
 		},
 	},
 	) {
-		clay.Text(
-			"Node",
+		clay.TextDynamic(
+			node.text,
 			clay.TextConfig({textColor = COLOR_BLACK, fontSize = 24, fontId = FONT_ID_TITLE_24}),
 		)
 	}
@@ -177,8 +179,11 @@ create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
 				backgroundColor = COLOR_LIGHT,
 			},
 			) {
-				layout_node_component(0, {0, 0})
-				layout_node_component(1, {500, 500})
+				node_iter := hm.make_iter(&g.graph.nodes)
+
+				for node in hm.iter(&node_iter) {
+					layout_node_component(node)
+				}
 			}
 			if clay.UI()(
 			{
