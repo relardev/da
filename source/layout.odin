@@ -74,8 +74,8 @@ layout_node_component :: proc(node: ^Node) {
 		},
 		layout = {
 			sizing = {
-				width = {type = .Fixed, constraints = {sizeMinMax = {min = node.width}}},
-				height = {type = .Fixed, constraints = {sizeMinMax = {min = node.height}}},
+				width = {type = .Fixed, constraints = {sizeMinMax = {min = node.width_px}}},
+				height = {type = .Fixed, constraints = {sizeMinMax = {min = node.height_px}}},
 			},
 		},
 	},

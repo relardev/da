@@ -94,7 +94,15 @@ game_init :: proc() {
 		raylib_fonts = make([dynamic]Raylib_Font, 10),
 	}
 
-	hm.add(&g.graph.nodes, Node{text = "Node 54", position = {100, 100}})
+	n1 := hm.add(&g.graph.nodes, Node{text = "Node 0"})
+	n2 := hm.add(&g.graph.nodes, Node{text = "Node 1"})
+	n3 := hm.add(&g.graph.nodes, Node{text = "Node 2"})
+
+	hm.add(&g.graph.edges, Edge{from = n1, to = n2})
+	hm.add(&g.graph.edges, Edge{from = n2, to = n3})
+	hm.add(&g.graph.edges, Edge{from = n1, to = n3})
+
+	graph_calculate_layout(&g.graph)
 
 	loadFont(FONT_ID_TITLE_16, 16, "assets/iosevka.ttf")
 	loadFont(FONT_ID_TITLE_24, 24, "assets/iosevka.ttf")
