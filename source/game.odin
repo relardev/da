@@ -94,13 +94,20 @@ game_init :: proc() {
 		raylib_fonts = make([dynamic]Raylib_Font, 10),
 	}
 
-	n1 := hm.add(&g.graph.nodes, Node{text = "Node 0"})
-	n2 := hm.add(&g.graph.nodes, Node{text = "Node 1"})
-	n3 := hm.add(&g.graph.nodes, Node{text = "Node 2"})
+	n0 := hm.add(&g.graph.nodes, Node{text = "Node 0"})
+	n1 := hm.add(&g.graph.nodes, Node{text = "Node 1"})
+	n2 := hm.add(&g.graph.nodes, Node{text = "Node 2"})
+	n3 := hm.add(&g.graph.nodes, Node{text = "Node 3"})
+	n4 := hm.add(&g.graph.nodes, Node{text = "Node 4"})
+	hm.add(&g.graph.nodes, Node{text = "Node 5"})
 
+	hm.add(&g.graph.edges, Edge{from = n0, to = n1})
 	hm.add(&g.graph.edges, Edge{from = n1, to = n2})
-	hm.add(&g.graph.edges, Edge{from = n2, to = n3})
+	hm.add(&g.graph.edges, Edge{from = n0, to = n2})
 	hm.add(&g.graph.edges, Edge{from = n1, to = n3})
+	hm.add(&g.graph.edges, Edge{from = n3, to = n4})
+	hm.add(&g.graph.edges, Edge{from = n2, to = n4})
+	hm.add(&g.graph.edges, Edge{from = n0, to = n4})
 
 	graph_calculate_layout(&g.graph)
 

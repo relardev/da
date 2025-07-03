@@ -13,12 +13,13 @@ NodeHandle :: hm.Handle
 EdgeHandle :: hm.Handle
 
 Node :: struct {
-	handle:    NodeHandle,
-	text:      string,
-	position:  Vec2,
-	width_px:  f32,
-	height_px: f32,
-	depth:     i32,
+	handle:      NodeHandle,
+	text:        string,
+	position:    Vec2i,
+	position_px: Vec2,
+	width_px:    f32,
+	height_px:   f32,
+	depth:       i32,
 }
 
 Edge :: struct {
@@ -29,6 +30,7 @@ Edge :: struct {
 
 graph_calculate_layout :: proc(graph: ^Graph) {
 	sorter: ts.Sorter(NodeHandle)
+	context.allocator = context.temp_allocator
 	ts.init(&sorter)
 	defer ts.destroy(&sorter)
 
@@ -40,21 +42,17 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 
 	edge_iter := hm.make_iter(&g.graph.edges)
 	for edge in hm.iter(&edge_iter) {
-		ok := ts.add_dependency(&sorter, edge.from, edge.to)
+		ok := ts.add_dependency(&sorter, edge.to, edge.from)
 		assert(ok, "Failed to add edge dependency to sorter")
 	}
 
-	nodes, cycled := ts.sort(&sorter)
+	nodes_sorted, cycled := ts.sort(&sorter)
 
 	assert(len(cycled) == 0, "Graph contains cycles")
 
-	layers := make(
-		map[NodeHandle]int,
-		hm.num_used(graph.nodes),
-		allocator = context.temp_allocator,
-	)
-	for node in nodes {
-		max_prev := 0
+	layers := make(map[NodeHandle]i32, hm.num_used(graph.nodes))
+	for node in nodes_sorted {
+		max_prev: i32 = 0
 		has_pred := false
 		for u in graph_predecessors_of(graph, node) {
 			has_pred = true
@@ -65,16 +63,37 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 		if has_pred {
 			layers[node] = max_prev
 		} else {
+			log.info("Node without predecessors:", node)
 			layers[node] = 0
 		}
 	}
 
-	log.info(layers)
+	for node_handle, layer in layers {
+		node := hm.get(&graph.nodes, node_handle)
+		node.position.y = layer
+		node.position_px.y = f32(node.position.y) * 100
+	}
+
+	layer_filling := make(map[i32][dynamic]NodeHandle)
+	for node_handle in layers {
+		node := hm.get(&graph.nodes, node_handle)
+		layer := layer_filling[node.position.y]
+		append(&layer, node_handle)
+		layer_filling[node.position.y] = layer
+	}
+
+	for _, nodes in layer_filling {
+		for node_handle, idx in nodes {
+			node := hm.get(&graph.nodes, node_handle)
+			node.position.x = i32(idx)
+			node.position_px.x = f32(node.position.x) * 100
+		}
+	}
 }
 
 graph_predecessors_of :: proc(graph: ^Graph, node: NodeHandle) -> []NodeHandle {
 	edges_iter := hm.make_iter(&graph.edges)
-	preds := make([dynamic]NodeHandle, 0, 16, allocator = context.temp_allocator)
+	preds := make([dynamic]NodeHandle, 0, 16)
 	for edge in hm.iter(&edges_iter) {
 		if edge.to == node {
 			append(&preds, edge.from)

@@ -70,7 +70,7 @@ layout_node_component :: proc(node: ^Node) {
 		floating = {
 			clipTo = .AttachedParent,
 			attachTo = .Parent,
-			offset = g.graph_drawing_offset + node.position,
+			offset = g.graph_drawing_offset + node.position_px,
 		},
 		layout = {
 			sizing = {
