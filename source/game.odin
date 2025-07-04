@@ -34,6 +34,10 @@ update :: proc() {
 		g.run = false
 	}
 
+	if rl.IsKeyPressed(.F5) {
+		g.graph.draw_gutters = !g.graph.draw_gutters
+	}
+
 	mouse_pos := rl.GetMousePosition()
 	if clay.PointerOver(g.graph_editor_id) && rl.IsMouseButtonDown(.LEFT) {
 		delta := g.prev_mouse_pos - mouse_pos
@@ -94,7 +98,7 @@ game_init :: proc() {
 		raylib_fonts = make([dynamic]Raylib_Font, 10),
 	}
 
-	n0 := hm.add(&g.graph.nodes, Node{text = "Node 0"})
+	n0 := hm.add(&g.graph.nodes, Node{text = "Node 0", size_px = {200, 200}})
 	n1 := hm.add(&g.graph.nodes, Node{text = "Node 1"})
 	n2 := hm.add(&g.graph.nodes, Node{text = "Node 2"})
 	n3 := hm.add(&g.graph.nodes, Node{text = "Node 3"})
@@ -135,6 +139,7 @@ game_should_run :: proc() -> bool {
 game_shutdown :: proc() {
 	free(g.clay_memory)
 	delete(g.raylib_fonts)
+	graph_close(&g.graph)
 	free(g)
 }
 

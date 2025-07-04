@@ -3,6 +3,7 @@ package game
 import clay "clay-odin"
 import "core:math"
 import "core:strings"
+import hm "handle_map"
 import rl "vendor:raylib"
 
 clay_color_to_rl_color :: proc(color: clay.Color) -> rl.Color {
@@ -167,11 +168,83 @@ clay_raylib_render :: proc(
 				)
 			}
 		case clay.RenderCommandType.Custom:
-		// Implement custom element rendering here
+			canvas_start := Vec2{bounds.x, bounds.y} + g.graph_drawing_offset
+
+			if g.graph.draw_gutters {
+				for gutter in g.graph.gutters_vertical {
+					rl.DrawRectangleLinesEx(
+						{
+							x = canvas_start.x + gutter.pos,
+							y = canvas_start.y,
+							width = gutter.size_px,
+							height = bounds.height,
+						},
+						2,
+						rl.GREEN,
+					)
+				}
+
+				for gutter in g.graph.gutters_horizontal {
+					rl.DrawRectangleLinesEx(
+						{
+							x = canvas_start.x,
+							y = canvas_start.y + gutter.pos,
+							width = bounds.width,
+							height = gutter.size_px,
+						},
+						2,
+						rl.BLUE,
+					)
+				}
+			}
+			// This is drawing edes for now
+			edge_iter := hm.make_iter(&g.graph.edges)
+			for edge in hm.iter(&edge_iter) {
+				from_node := hm.get(&g.graph.nodes, edge.from)
+				to_node := hm.get(&g.graph.nodes, edge.to)
+
+				start := canvas_start + from_node.position_px + 0.5 * from_node.size_px
+
+				end := canvas_start + to_node.position_px + (0.5 * {to_node.size_px.x, 0})
+				// Draw the edge line
+				rl.DrawLineEx(start, end, 1, rl.RED)
+				//Draw the arrow
+				// rl.DrawTriangle(end, end + Vec2{10, -20}, end + Vec2{-10, -20}, rl.RED)
+				draw_arrow(end, down)
+			}
+
 		}
 	}
 }
 
+down: Vec2i = {0, 1}
+left: Vec2i = {-1, 0}
+right: Vec2i = {1, 0}
+
+draw_arrow :: proc(pos: Vec2, direction: Vec2i) {
+	// Draw an arrow at the given position, pointing in the specified direction
+	// The arrow is drawn as a triangle with a base of 20 pixels and a height of 10 pixels
+	arrow_base: f32 = 20.0
+	arrow_height: f32 = 10.0
+
+	upper_right, upper_left: Vec2
+	switch direction {
+	case down:
+		upper_right = pos + {arrow_height, -arrow_base}
+		upper_left = pos + {-arrow_height, -arrow_base}
+	case left:
+		upper_right = pos + {arrow_base, arrow_height}
+		upper_left = pos + {arrow_base, -arrow_height}
+	case right:
+		upper_right = pos + {-arrow_base, -arrow_height}
+		upper_left = pos + {-arrow_base, arrow_height}
+	case:
+		panic("Unsupported direction for arrow drawing")
+	}
+
+	// Draw the arrow triangle
+	rl.DrawTriangle(pos, upper_right, upper_left, rl.RED)
+}
 // Helper procs, mainly for repeated conversions
 
 @(private = "file")

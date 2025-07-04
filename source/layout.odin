@@ -74,8 +74,8 @@ layout_node_component :: proc(node: ^Node) {
 		},
 		layout = {
 			sizing = {
-				width = {type = .Fixed, constraints = {sizeMinMax = {min = node.width_px}}},
-				height = {type = .Fixed, constraints = {sizeMinMax = {min = node.height_px}}},
+				width = {type = .Fixed, constraints = {sizeMinMax = {min = node.size_px.x}}},
+				height = {type = .Fixed, constraints = {sizeMinMax = {min = node.size_px.y}}},
 			},
 		},
 	},
@@ -179,8 +179,18 @@ create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
 				backgroundColor = COLOR_LIGHT,
 			},
 			) {
-				node_iter := hm.make_iter(&g.graph.nodes)
+				if clay.UI()(
+				{
+					id = clay.ID("GraphEdges"),
+					layout = {
+						sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})},
+					},
+					// passing g.graph is not necessary, but this doesn't work when i pass
+					custom = {customData = &g.graph},
+				},
+				) {}
 
+				node_iter := hm.make_iter(&g.graph.nodes)
 				for node in hm.iter(&node_iter) {
 					layout_node_component(node)
 				}
