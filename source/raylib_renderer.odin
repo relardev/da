@@ -1,6 +1,7 @@
 package game
 
 import clay "clay-odin"
+import "core:fmt"
 import "core:math"
 import "core:strings"
 import hm "handle_map"
@@ -172,6 +173,13 @@ clay_raylib_render :: proc(
 
 			if g.graph.draw_gutters {
 				for gutter in g.graph.gutters_vertical {
+					rl.DrawText(
+						fmt.ctprintf("%d", len(gutter.edges)),
+						i32(canvas_start.x + gutter.pos + 5.0),
+						i32(canvas_start.y + 5),
+						20,
+						rl.BLACK,
+					)
 					rl.DrawRectangleLinesEx(
 						{
 							x = canvas_start.x + gutter.pos,
@@ -185,6 +193,13 @@ clay_raylib_render :: proc(
 				}
 
 				for gutter in g.graph.gutters_horizontal {
+					rl.DrawText(
+						fmt.ctprintf("%d", len(gutter.edges)),
+						i32(canvas_start.x + 5),
+						i32(canvas_start.y + gutter.pos + 5.0),
+						20,
+						rl.BLACK,
+					)
 					rl.DrawRectangleLinesEx(
 						{
 							x = canvas_start.x,

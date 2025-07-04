@@ -153,6 +153,7 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 		}
 	}
 
+	// Fill cell sizes
 	node_iter = hm.make_iter(&graph.nodes)
 	for node in hm.iter(&node_iter) {
 		if graph.cell_size_px.x < node.size_px.x {
@@ -178,8 +179,7 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 		}
 	}
 
-	log.info("max node size px:", graph.cell_size_px)
-
+	// Fill node positions
 	node_iter = hm.make_iter(&graph.nodes)
 	for node in hm.iter(&node_iter) {
 		node.size_px = graph.cell_size_px
