@@ -4,10 +4,14 @@ import ts "core:container/topological_sort"
 import "core:log"
 import hm "handle_map"
 
+gutter_edge_distance: f32 = 10.0 // distance between edges in gutters
+gutter_padding: f32 = 40.0 // padding around gutters
+
 Graph :: struct {
 	nodes:              hm.Handle_Map(Node, NodeHandle, 1024),
 	edges:              hm.Handle_Map(Edge, EdgeHandle, 1024),
 	draw_gutters:       bool,
+	draw_nodes:         bool,
 	gutters_vertical:   [dynamic]Gutter,
 	gutters_horizontal: [dynamic]Gutter,
 	cell_size_px:       Vec2,
@@ -25,10 +29,16 @@ Node :: struct {
 	depth:       i32,
 }
 
+down: i32 = 1
+left: i32 = 2
+right: i32 = 3
+
 Edge :: struct {
-	handle: EdgeHandle,
-	from:   NodeHandle,
-	to:     NodeHandle,
+	handle:          EdgeHandle,
+	from:            NodeHandle,
+	to:              NodeHandle,
+	segments:        [5]Vec2, // points in pixels
+	arrow_direction: i32,
 }
 
 Gutter :: struct {
@@ -108,7 +118,7 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 	graph.gutters_vertical = make([dynamic]Gutter, x_max + 2, allocator = main_allocator)
 	graph.gutters_horizontal = make([dynamic]Gutter, y_max + 2, allocator = main_allocator)
 
-	// Calculate gutters edges
+	// Calculate gutters sizes
 	{
 		edges_iter := hm.make_iter(&graph.edges)
 		for edge in hm.iter(&edges_iter) {
@@ -134,22 +144,26 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 					continue // dont use vertical gutter if the edges are on adjecent rows
 				}
 
-				vertical := from_node.position.x + 1
-				if from_node.position.y < to_node.position.y {
-					vertical = to_node.position.x
+				vertical_gutter_idx: int
+				if from_node.position.x == to_node.position.x {
+					vertical_gutter_idx = int(from_node.position.x)
+				} else if from_node.position.x < to_node.position.x {
+					vertical_gutter_idx = int(to_node.position.x)
+				} else {
+					vertical_gutter_idx = int(to_node.position.x + 1)
 				}
 
-				vertical_edges := &graph.gutters_vertical[vertical].edges
+				vertical_edges := &graph.gutters_vertical[vertical_gutter_idx].edges
 				append(vertical_edges, edge.handle)
 			}
 		}
 
 		for &gutter in graph.gutters_vertical {
-			gutter.size_px = f32(10 * len(gutter.edges))
+			gutter.size_px = 2 * gutter_padding + gutter_edge_distance * f32(len(gutter.edges))
 		}
 
 		for &gutter in graph.gutters_horizontal {
-			gutter.size_px = f32(10 * len(gutter.edges))
+			gutter.size_px = 2 * gutter_padding + gutter_edge_distance * f32(len(gutter.edges))
 		}
 	}
 
@@ -185,6 +199,81 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 		node.size_px = graph.cell_size_px
 		node.position_px = graph_get_node_position_px(graph, node.position)
 	}
+
+	graph_print_gutter(graph)
+
+	// Fill edge segments
+	{
+		edges_iter := hm.make_iter(&graph.edges)
+		for edge in hm.iter(&edges_iter) {
+			from_node := hm.get(&graph.nodes, edge.from)
+			to_node := hm.get(&graph.nodes, edge.to)
+
+			// middle of from_node
+			edge.segments[0] = from_node.position_px + 0.5 * from_node.size_px
+
+			if from_node.position.y + 1 == to_node.position.y &&
+			   from_node.position.x == to_node.position.x {
+				// upper edge of to_node 
+				edge.segments[1] = to_node.position_px + (0.5 * {to_node.size_px.x, 0})
+				edge.arrow_direction = down
+				continue
+			}
+
+			horizontal_gutter := graph.gutters_horizontal[from_node.position.y + 1]
+			horizontal_lane := graph_lane_for_edge(&horizontal_gutter, edge.handle)
+
+			// horizontal gutter entrance
+			edge.segments[1] = {
+				edge.segments[0].x,
+				horizontal_gutter.pos +
+				gutter_padding +
+				f32(horizontal_lane) * gutter_edge_distance,
+			}
+
+			vertical_gutter_idx: int
+			if from_node.position.x == to_node.position.x {
+				vertical_gutter_idx = int(from_node.position.x)
+			} else if from_node.position.x < to_node.position.x {
+				vertical_gutter_idx = int(to_node.position.x)
+			} else {
+				vertical_gutter_idx = int(to_node.position.x + 1)
+			}
+
+			vertical_gutter := graph.gutters_vertical[vertical_gutter_idx]
+			vertical_lane := graph_lane_for_edge(&vertical_gutter, edge.handle)
+
+			// gutter crossing
+			edge.segments[2] = {
+				vertical_gutter.pos + gutter_padding + f32(vertical_lane) * gutter_edge_distance,
+				edge.segments[1].y,
+			}
+
+			// vertical gutter exit
+			edge.segments[3] = {
+				edge.segments[2].x,
+				to_node.position_px.y + 0.5 * to_node.size_px.y,
+			}
+
+			// target edge
+			if edge.segments[3].x < to_node.position_px.x {
+				edge.segments[4] = {to_node.position_px.x, edge.segments[3].y}
+				edge.arrow_direction = right
+			} else {
+				edge.segments[4] = {to_node.position_px.x + to_node.size_px.x, edge.segments[3].y}
+				edge.arrow_direction = left
+			}
+		}
+	}
+}
+
+graph_lane_for_edge :: proc(gutter: ^Gutter, edge_handle: EdgeHandle) -> i32 {
+	for edge, i in gutter.edges {
+		if edge == edge_handle {
+			return i32(i)
+		}
+	}
+	panic("Edge not found in gutter")
 }
 
 graph_get_node_position_px :: proc(graph: ^Graph, node_pos: Vec2i) -> Vec2 {
@@ -233,6 +322,7 @@ graph_close :: proc(graph: ^Graph) {
 }
 
 graph_print_gutter :: proc(graph: ^Graph) {
+	log.info("Vertical Gutters:")
 	for gutter, i in graph.gutters_vertical {
 		for edge_handle in gutter.edges {
 			edge := hm.get(&graph.edges, edge_handle)
@@ -242,6 +332,7 @@ graph_print_gutter :: proc(graph: ^Graph) {
 		}
 	}
 
+	log.info("Horizontal Gutters:")
 	for gutter, i in graph.gutters_horizontal {
 		for edge_handle in gutter.edges {
 			edge := hm.get(&graph.edges, edge_handle)

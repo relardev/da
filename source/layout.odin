@@ -190,9 +190,11 @@ create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
 				},
 				) {}
 
-				node_iter := hm.make_iter(&g.graph.nodes)
-				for node in hm.iter(&node_iter) {
-					layout_node_component(node)
+				if g.graph.draw_nodes {
+					node_iter := hm.make_iter(&g.graph.nodes)
+					for node in hm.iter(&node_iter) {
+						layout_node_component(node)
+					}
 				}
 			}
 			if clay.UI()(

@@ -215,28 +215,24 @@ clay_raylib_render :: proc(
 			// This is drawing edes for now
 			edge_iter := hm.make_iter(&g.graph.edges)
 			for edge in hm.iter(&edge_iter) {
-				from_node := hm.get(&g.graph.nodes, edge.from)
-				to_node := hm.get(&g.graph.nodes, edge.to)
+				last := 0
+				for point, i in edge.segments[1:] {
+					if point == {} {
+						break
+					}
+					start := edge.segments[i] + canvas_start
+					end := point + canvas_start
+					rl.DrawLineEx(start, end, 1, rl.RED)
+					last = i
+				}
 
-				start := canvas_start + from_node.position_px + 0.5 * from_node.size_px
-
-				end := canvas_start + to_node.position_px + (0.5 * {to_node.size_px.x, 0})
-				// Draw the edge line
-				rl.DrawLineEx(start, end, 1, rl.RED)
-				//Draw the arrow
-				// rl.DrawTriangle(end, end + Vec2{10, -20}, end + Vec2{-10, -20}, rl.RED)
-				draw_arrow(end, down)
+				draw_arrow(edge.segments[last + 1] + canvas_start, edge.arrow_direction)
 			}
-
 		}
 	}
 }
 
-down: Vec2i = {0, 1}
-left: Vec2i = {-1, 0}
-right: Vec2i = {1, 0}
-
-draw_arrow :: proc(pos: Vec2, direction: Vec2i) {
+draw_arrow :: proc(pos: Vec2, direction: i32) {
 	// Draw an arrow at the given position, pointing in the specified direction
 	// The arrow is drawn as a triangle with a base of 20 pixels and a height of 10 pixels
 	arrow_base: f32 = 20.0

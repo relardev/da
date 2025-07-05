@@ -34,8 +34,11 @@ update :: proc() {
 		g.run = false
 	}
 
-	if rl.IsKeyPressed(.F5) {
+	if rl.IsKeyPressed(.F4) {
 		g.graph.draw_gutters = !g.graph.draw_gutters
+	}
+	if rl.IsKeyPressed(.F3) {
+		g.graph.draw_nodes = !g.graph.draw_nodes
 	}
 
 	mouse_pos := rl.GetMousePosition()
@@ -89,16 +92,25 @@ game_init :: proc() {
 	g = new(Game_Memory)
 
 	g^ = Game_Memory {
-		run          = true,
-		clay_memory  = clay_memory,
-		clay_arena   = clay.CreateArenaWithCapacityAndMemory(
+		run = true,
+		clay_memory = clay_memory,
+		clay_arena = clay.CreateArenaWithCapacityAndMemory(
 			uint(clay_min_memory_size),
 			clay_memory,
 		),
 		raylib_fonts = make([dynamic]Raylib_Font, 10),
+		graph = Graph{draw_nodes = true},
 	}
 
+	// n0 := hm.add(&g.graph.nodes, Node{text = "Node 0", size_px = {200, 200}})
+	// n1 := hm.add(&g.graph.nodes, Node{text = "Node 1"})
+	// n2 := hm.add(&g.graph.nodes, Node{text = "Node top2"})
+	//
+	// hm.add(&g.graph.edges, Edge{from = n0, to = n1})
+	// hm.add(&g.graph.edges, Edge{from = n2, to = n1})
+
 	n0 := hm.add(&g.graph.nodes, Node{text = "Node 0", size_px = {200, 200}})
+	n02 := hm.add(&g.graph.nodes, Node{text = "Node 02"})
 	n1 := hm.add(&g.graph.nodes, Node{text = "Node 1"})
 	n2 := hm.add(&g.graph.nodes, Node{text = "Node 2"})
 	n3 := hm.add(&g.graph.nodes, Node{text = "Node 3"})
@@ -108,10 +120,12 @@ game_init :: proc() {
 	hm.add(&g.graph.edges, Edge{from = n0, to = n1})
 	hm.add(&g.graph.edges, Edge{from = n1, to = n2})
 	hm.add(&g.graph.edges, Edge{from = n0, to = n2})
+	hm.add(&g.graph.edges, Edge{from = n02, to = n2})
+	hm.add(&g.graph.edges, Edge{from = n0, to = n3})
 	hm.add(&g.graph.edges, Edge{from = n1, to = n3})
-	hm.add(&g.graph.edges, Edge{from = n3, to = n4})
-	hm.add(&g.graph.edges, Edge{from = n2, to = n4})
-	hm.add(&g.graph.edges, Edge{from = n0, to = n4})
+	hm.add(&g.graph.edges, Edge{from = n2, to = n3})
+	hm.add(&g.graph.edges, Edge{from = n1, to = n4})
+	hm.add(&g.graph.edges, Edge{from = n4, to = n3})
 
 	graph_calculate_layout(&g.graph)
 
