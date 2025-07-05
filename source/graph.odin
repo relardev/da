@@ -221,7 +221,7 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 			}
 
 			horizontal_gutter := graph.gutters_horizontal[from_node.position.y + 1]
-			horizontal_lane := graph_lane_for_edge(&horizontal_gutter, edge.handle)
+			horizontal_lane := graph_horizontal_lane_for_edge(graph, &horizontal_gutter, edge)
 
 			// horizontal gutter entrance
 			edge.segments[1] = {
@@ -241,7 +241,7 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 			}
 
 			vertical_gutter := graph.gutters_vertical[vertical_gutter_idx]
-			vertical_lane := graph_lane_for_edge(&vertical_gutter, edge.handle)
+			vertical_lane := graph_vertical_lane_for_edge(graph, &vertical_gutter, edge)
 
 			// gutter crossing
 			edge.segments[2] = {
@@ -267,9 +267,19 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 	}
 }
 
-graph_lane_for_edge :: proc(gutter: ^Gutter, edge_handle: EdgeHandle) -> i32 {
-	for edge, i in gutter.edges {
-		if edge == edge_handle {
+graph_horizontal_lane_for_edge :: proc(graph: ^Graph, gutter: ^Gutter, edge: ^Edge) -> i32 {
+	for edgeHandle, i in gutter.edges {
+		edge_gutter := hm.get(&graph.edges, edgeHandle)
+		if edge_gutter.from == edge.from {
+			return i32(i)
+		}
+	}
+	panic("Edge not found in gutter")
+}
+graph_vertical_lane_for_edge :: proc(graph: ^Graph, gutter: ^Gutter, edge: ^Edge) -> i32 {
+	for edgeHandle, i in gutter.edges {
+		edge_gutter := hm.get(&graph.edges, edgeHandle)
+		if edge_gutter.to == edge.to {
 			return i32(i)
 		}
 	}
