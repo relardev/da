@@ -6,8 +6,11 @@ import hm "handle_map"
 // Define some colors.
 COLOR_LIGHT :: clay.Color{224, 215, 210, 255}
 COLOR_RED :: clay.Color{168, 66, 28, 255}
+COLOR_RED_LIGHT :: clay.Color{220, 66, 28, 255}
 COLOR_ORANGE :: clay.Color{225, 138, 50, 255}
+COLOR_ORANGE_LIGHT :: clay.Color{255, 200, 150, 255}
 COLOR_BLACK :: clay.Color{0, 0, 0, 255}
+COLOR_GREEN :: clay.Color{30, 220, 30, 255}
 
 sidebar_item_layout := clay.LayoutConfig {
 	sizing = {width = clay.SizingGrow({}), height = clay.SizingFixed(50)},
@@ -63,10 +66,29 @@ button_component :: proc(id: clay.ElementId, $text: string) {
 }
 
 layout_node_component :: proc(node: ^Node) {
+	id := clay.ID("Node", node.handle.idx)
+	node.clay_id = id
+
+	border := clay.BorderElementConfig {
+		width = {left = 2, right = 2, top = 2, bottom = 2},
+		color = COLOR_ORANGE,
+	}
+	if g.graph_selected_node == id {
+		border.color = COLOR_GREEN
+	}
+
+	color := COLOR_RED
+	for highlighted in g.graph_highlighted_nodes {
+		if highlighted == id {
+			color = COLOR_RED_LIGHT
+			break
+		}
+	}
+
 	if clay.UI()(
 	{
-		id = clay.ID("Node", node.handle.idx),
-		backgroundColor = COLOR_RED,
+		id = id,
+		backgroundColor = color,
 		floating = {
 			clipTo = .AttachedParent,
 			attachTo = .Parent,
@@ -78,6 +100,7 @@ layout_node_component :: proc(node: ^Node) {
 				height = {type = .Fixed, constraints = {sizeMinMax = {min = node.size_px.y}}},
 			},
 		},
+		border = border,
 	},
 	) {
 		clay.TextDynamic(

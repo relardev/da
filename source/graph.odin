@@ -1,5 +1,6 @@
 package game
 
+import clay "clay-odin"
 import ts "core:container/topological_sort"
 import "core:log"
 import hm "handle_map"
@@ -27,6 +28,7 @@ Node :: struct {
 	position_px: Vec2,
 	size_px:     Vec2,
 	depth:       i32,
+	clay_id:     clay.ElementId,
 }
 
 down: i32 = 1
@@ -308,15 +310,55 @@ graph_get_node_position_px :: proc(graph: ^Graph, node_pos: Vec2i) -> Vec2 {
 	return {width, height}
 }
 
-graph_predecessors_of :: proc(graph: ^Graph, node: NodeHandle) -> []NodeHandle {
+graph_predecessors_of :: proc(
+	graph: ^Graph,
+	node: NodeHandle,
+	allocator := context.allocator,
+) -> []NodeHandle {
 	edges_iter := hm.make_iter(&graph.edges)
-	preds := make([dynamic]NodeHandle, 0, 16)
+	preds := make([dynamic]NodeHandle, 0, 16, allocator = allocator)
 	for edge in hm.iter(&edges_iter) {
 		if edge.to == node {
 			append(&preds, edge.from)
 		}
 	}
 	return preds[:]
+}
+graph_clay_connected_nodes :: proc(
+	graph: ^Graph,
+	node_handle: NodeHandle,
+	allocator := context.allocator,
+) -> []clay.ElementId {
+	edges_iter := hm.make_iter(&graph.edges)
+	preds := make([dynamic]clay.ElementId, 0, 16, allocator = allocator)
+	for edge in hm.iter(&edges_iter) {
+		if edge.to == node_handle {
+			node := hm.get(&graph.nodes, edge.from)
+			append(&preds, node.clay_id)
+		}
+		if edge.from == node_handle {
+			node := hm.get(&graph.nodes, edge.to)
+			append(&preds, node.clay_id)
+		}
+	}
+	return preds[:]
+}
+
+graph_edges_of :: proc(
+	graph: ^Graph,
+	node: NodeHandle,
+	allocator := context.allocator,
+) -> []EdgeHandle {
+	edges := make([dynamic]EdgeHandle, 0, 16, allocator = allocator)
+
+	edges_iter := hm.make_iter(&graph.edges)
+	for edge in hm.iter(&edges_iter) {
+		if edge.from == node || edge.to == node {
+			append(&edges, edge.handle)
+		}
+	}
+
+	return edges[:]
 }
 
 graph_close :: proc(graph: ^Graph) {

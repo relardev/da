@@ -11,15 +11,18 @@ Vec2 :: [2]f32
 Vec2i :: [2]i32
 
 Game_Memory :: struct {
-	run:                  bool,
-	clay_debug_mode:      bool,
-	clay_memory:          rawptr, // Pointer to the clay memory allocator.
-	clay_arena:           clay.Arena, // Arena for clay memory allocations.
-	raylib_fonts:         [dynamic]Raylib_Font,
-	graph_drawing_offset: Vec2,
-	graph_editor_id:      clay.ElementId,
-	prev_mouse_pos:       Vec2,
-	graph:                Graph,
+	run:                     bool,
+	clay_debug_mode:         bool,
+	clay_memory:             rawptr, // Pointer to the clay memory allocator.
+	clay_arena:              clay.Arena, // Arena for clay memory allocations.
+	raylib_fonts:            [dynamic]Raylib_Font,
+	prev_mouse_pos:          Vec2,
+	graph:                   Graph,
+	graph_selected_node:     clay.ElementId,
+	graph_highlighted_nodes: []clay.ElementId,
+	graph_highlighted_edges: []EdgeHandle,
+	graph_drawing_offset:    Vec2,
+	graph_editor_id:         clay.ElementId,
 }
 
 g: ^Game_Memory
@@ -48,6 +51,37 @@ update :: proc() {
 	}
 	g.prev_mouse_pos = mouse_pos
 
+	// select, highlight nodes and edges
+	{
+		node_handle: NodeHandle
+		node_iter := hm.make_iter(&g.graph.nodes)
+		g.graph_selected_node = {}
+		for node in hm.iter(&node_iter) {
+			if clay.PointerOver(node.clay_id) {
+				g.graph_selected_node = node.clay_id
+				node_handle = node.handle
+				break
+			}
+		}
+
+		if g.graph_selected_node != {} {
+			g.graph_highlighted_nodes = graph_clay_connected_nodes(
+				&g.graph,
+				node_handle,
+				context.temp_allocator,
+			)
+
+			g.graph_highlighted_edges = graph_edges_of(
+				&g.graph,
+				node_handle,
+				context.temp_allocator,
+			)
+		} else {
+			g.graph_highlighted_nodes = nil
+			g.graph_highlighted_edges = nil
+		}
+	}
+
 	clay.SetPointerState(rl.GetMousePosition(), rl.IsMouseButtonDown(rl.MouseButton.LEFT))
 	clay.UpdateScrollContainers(false, rl.GetMouseWheelMoveV(), rl.GetFrameTime())
 	clay.SetLayoutDimensions({cast(f32)rl.GetScreenWidth(), cast(f32)rl.GetScreenHeight()})
@@ -75,7 +109,7 @@ game_init_window :: proc() {
 	rl.SetConfigFlags({.VSYNC_HINT, .WINDOW_RESIZABLE, .MSAA_4X_HINT})
 	rl.InitWindow(1024, 768, "Odin")
 	rl.SetTargetFPS(rl.GetMonitorRefreshRate(0))
-	rl.SetTargetFPS(10)
+	// rl.SetTargetFPS(10)
 	rl.SetExitKey(nil)
 }
 

@@ -212,7 +212,7 @@ clay_raylib_render :: proc(
 					)
 				}
 			}
-			// This is drawing edes for now
+
 			edge_iter := hm.make_iter(&g.graph.edges)
 			for edge in hm.iter(&edge_iter) {
 				last := 0
