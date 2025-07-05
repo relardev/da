@@ -3,14 +3,49 @@ package game
 import clay "clay-odin"
 import hm "handle_map"
 
-// Define some colors.
-COLOR_LIGHT :: clay.Color{224, 215, 210, 255}
-COLOR_RED :: clay.Color{168, 66, 28, 255}
-COLOR_RED_LIGHT :: clay.Color{220, 66, 28, 255}
-COLOR_ORANGE :: clay.Color{225, 138, 50, 255}
-COLOR_ORANGE_LIGHT :: clay.Color{255, 200, 150, 255}
-COLOR_BLACK :: clay.Color{0, 0, 0, 255}
-COLOR_GREEN :: clay.Color{30, 220, 30, 255}
+
+COLOR_MODIFIER := clay.Color{20, 20, 20, 0}
+WHITE := clay.Color{255, 255, 255, 255}
+BLACK := clay.Color{0, 0, 0, 255}
+
+CHARCOAL := clay.Color{38, 70, 83, 255}
+CHARCOAL_H := CHARCOAL + COLOR_MODIFIER
+CHARCOAL_L := CHARCOAL - COLOR_MODIFIER
+
+PERSIAN_GREEN := clay.Color{42, 157, 143, 255}
+PERSIAN_GREEN_H := PERSIAN_GREEN + COLOR_MODIFIER
+PERSIAN_GREEN_L := PERSIAN_GREEN - COLOR_MODIFIER
+
+SAFFRON := clay.Color{233, 196, 106, 255}
+SAFFRON_H := SAFFRON + COLOR_MODIFIER
+SAFFRON_L := SAFFRON - COLOR_MODIFIER
+
+SANDY_BROWN := clay.Color{244, 162, 97, 255}
+SANDY_BROWN_H := SANDY_BROWN + COLOR_MODIFIER
+SANDY_BROWN_L := SANDY_BROWN - COLOR_MODIFIER
+
+BURNT_SIENNA := clay.Color{231, 111, 81, 255}
+BURNT_SIENNA_H := BURNT_SIENNA + COLOR_MODIFIER
+BURNT_SIENNA_L := BURNT_SIENNA - COLOR_MODIFIER
+
+
+COLOR_BACKGROUND := CHARCOAL
+COLOR_BACKGROUND_H := CHARCOAL_H
+COLOR_BACKGROUND_L := CHARCOAL_L
+
+COLOR_NODE_BORDER := BURNT_SIENNA
+COLOR_NODE_BORDER_H := WHITE
+COLOR_NODE_BORDER_L := BURNT_SIENNA_L
+
+COLOR_NODE_BACKGROUND := PERSIAN_GREEN
+COLOR_NODE_BACKGROUND_H := PERSIAN_GREEN_H
+COLOR_NODE_BACKGROUND_L := PERSIAN_GREEN_L
+
+COLOR_EDITOR_BACKGROUND := CHARCOAL
+
+COLOR_EDGE := BURNT_SIENNA
+COLOR_EDGE_H := WHITE
+COLOR_EDGE_L := BURNT_SIENNA_L
 
 sidebar_item_layout := clay.LayoutConfig {
 	sizing = {width = clay.SizingGrow({}), height = clay.SizingFixed(50)},
@@ -36,12 +71,12 @@ sidebar_item_component :: proc(bt: block_type) {
 	{
 		id = clay.ID("SidebarBlob", u32(bt)),
 		layout = sidebar_item_layout,
-		backgroundColor = COLOR_ORANGE,
+		backgroundColor = COLOR_BACKGROUND_H,
 	},
 	) {
 		clay.TextDynamic(
 			label,
-			clay.TextConfig({textColor = COLOR_BLACK, fontSize = 16, fontId = FONT_ID_TITLE_16}),
+			clay.TextConfig({textColor = BLACK, fontSize = 16, fontId = FONT_ID_TITLE_16}),
 		)
 	}
 }
@@ -55,12 +90,12 @@ button_component :: proc(id: clay.ElementId, $text: string) {
 			sizing = {width = clay.SizingFit({}), height = clay.SizingGrow({})},
 			childAlignment = {y = .Center},
 		},
-		backgroundColor = COLOR_ORANGE,
+		backgroundColor = COLOR_BACKGROUND,
 	},
 	) {
 		clay.Text(
 			text,
-			clay.TextConfig({textColor = COLOR_BLACK, fontSize = 16, fontId = FONT_ID_TITLE_16}),
+			clay.TextConfig({textColor = BLACK, fontSize = 16, fontId = FONT_ID_TITLE_16}),
 		)
 	}
 }
@@ -71,24 +106,32 @@ layout_node_component :: proc(node: ^Node) {
 
 	border := clay.BorderElementConfig {
 		width = {left = 2, right = 2, top = 2, bottom = 2},
-		color = COLOR_ORANGE,
+		color = COLOR_NODE_BORDER,
 	}
-	if g.graph_selected_node == id {
-		border.color = COLOR_GREEN
-	}
+	background_color := COLOR_NODE_BACKGROUND
 
-	color := COLOR_RED
-	for highlighted in g.graph_highlighted_nodes {
-		if highlighted == id {
-			color = COLOR_RED_LIGHT
-			break
+	if g.graph_selected_node == id {
+		border.color = COLOR_NODE_BORDER_H
+		background_color = COLOR_NODE_BACKGROUND_H
+	} else {
+		FIND_HIGHLIGHTS: {
+			if g.graph_selected_node != {} {
+				for highlighted in g.graph_highlighted_nodes {
+					if highlighted == id {
+						background_color = COLOR_NODE_BACKGROUND_H
+						break FIND_HIGHLIGHTS
+					}
+					border.color = COLOR_NODE_BORDER_L
+					background_color = COLOR_NODE_BACKGROUND_L
+				}
+			}
 		}
 	}
 
 	if clay.UI()(
 	{
 		id = id,
-		backgroundColor = color,
+		backgroundColor = background_color,
 		floating = {
 			clipTo = .AttachedParent,
 			attachTo = .Parent,
@@ -105,7 +148,7 @@ layout_node_component :: proc(node: ^Node) {
 	) {
 		clay.TextDynamic(
 			node.text,
-			clay.TextConfig({textColor = COLOR_BLACK, fontSize = 24, fontId = FONT_ID_TITLE_24}),
+			clay.TextConfig({textColor = BLACK, fontSize = 24, fontId = FONT_ID_TITLE_24}),
 		)
 	}
 }
@@ -133,7 +176,7 @@ create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
 				childGap = 16,
 				sizing = {width = clay.SizingGrow({}), height = clay.SizingFixed(50)},
 			},
-			backgroundColor = COLOR_LIGHT,
+			backgroundColor = COLOR_BACKGROUND,
 		},
 		) {
 			if clay.UI()(
@@ -144,14 +187,12 @@ create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
 					padding = {8, 8, 0, 0},
 					childAlignment = {y = .Center},
 				},
-				backgroundColor = COLOR_RED,
+				backgroundColor = BURNT_SIENNA,
 			},
 			) {
 				clay.Text(
 					"WP Datapower | Zainteresowania | Styl i moda | Uroda | Pielegnacja i stylizacja paznokci",
-					clay.TextConfig(
-						{textColor = COLOR_BLACK, fontSize = 32, fontId = FONT_ID_TITLE_32},
-					),
+					clay.TextConfig({textColor = BLACK, fontSize = 32, fontId = FONT_ID_TITLE_32}),
 				)
 			}
 
@@ -176,9 +217,7 @@ create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
 			) {
 				clay.Text(
 					"|",
-					clay.TextConfig(
-						{textColor = COLOR_BLACK, fontSize = 16, fontId = FONT_ID_TITLE_16},
-					),
+					clay.TextConfig({textColor = BLACK, fontSize = 16, fontId = FONT_ID_TITLE_16}),
 				)
 			}
 			button_component(clay.ID("DeleteButton"), "Delete")
@@ -199,7 +238,7 @@ create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
 				id = g.graph_editor_id,
 				layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})}},
 				clip = {horizontal = true, vertical = true},
-				backgroundColor = COLOR_LIGHT,
+				backgroundColor = COLOR_EDITOR_BACKGROUND,
 			},
 			) {
 				if clay.UI()(
@@ -229,7 +268,7 @@ create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
 					padding = {16, 16, 16, 16},
 					childGap = 16,
 				},
-				backgroundColor = COLOR_LIGHT,
+				backgroundColor = COLOR_BACKGROUND,
 			},
 			) {
 				if clay.UI()(
@@ -241,14 +280,14 @@ create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
 						childGap = 16,
 						childAlignment = {y = .Center},
 					},
-					backgroundColor = COLOR_RED,
+					backgroundColor = COLOR_BACKGROUND_L,
 					cornerRadius = {6, 6, 6, 6},
 				},
 				) {
 					clay.Text(
 						"Search:",
 						clay.TextConfig(
-							{textColor = COLOR_BLACK, fontSize = 24, fontId = FONT_ID_TITLE_24},
+							{textColor = BLACK, fontSize = 24, fontId = FONT_ID_TITLE_24},
 						),
 					)
 				}

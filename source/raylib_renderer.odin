@@ -213,26 +213,53 @@ clay_raylib_render :: proc(
 				}
 			}
 
-			edge_iter := hm.make_iter(&g.graph.edges)
-			for edge in hm.iter(&edge_iter) {
-				last := 0
-				for point, i in edge.segments[1:] {
-					if point == {} {
-						break
-					}
-					start := edge.segments[i] + canvas_start
-					end := point + canvas_start
-					rl.DrawLineEx(start, end, 1, rl.RED)
-					last = i
-				}
+			if g.graph_selected_node != {} {
+				highlighted_edges := make(
+					[dynamic]Edge,
+					0,
+					len(g.graph_highlighted_edges),
+					allocator = context.temp_allocator,
+				)
 
-				draw_arrow(edge.segments[last + 1] + canvas_start, edge.arrow_direction)
+				edge_iter := hm.make_iter(&g.graph.edges)
+				not_highlighted: for edge in hm.iter(&edge_iter) {
+					for selected_edge in g.graph_highlighted_edges {
+						if selected_edge == edge.handle {
+							append(&highlighted_edges, edge^)
+							continue not_highlighted
+						}
+					}
+					draw_edge(edge, canvas_start, clay_color_to_rl_color(COLOR_EDGE_L))
+				}
+				for &edge in highlighted_edges {
+					draw_edge(&edge, canvas_start, clay_color_to_rl_color(COLOR_EDGE_H))
+				}
+			} else {
+				edge_iter := hm.make_iter(&g.graph.edges)
+				for edge in hm.iter(&edge_iter) {
+					draw_edge(edge, canvas_start, clay_color_to_rl_color(COLOR_EDGE))
+				}
 			}
 		}
 	}
 }
 
-draw_arrow :: proc(pos: Vec2, direction: i32) {
+draw_edge :: proc(edge: ^Edge, canvas_start: Vec2, color: rl.Color) {
+	last := 0
+	for point, i in edge.segments[1:] {
+		if point == {} {
+			break
+		}
+		start := edge.segments[i] + canvas_start
+		end := point + canvas_start
+		rl.DrawLineEx(start, end, 1, color)
+		last = i
+	}
+
+	draw_arrow(edge.segments[last + 1] + canvas_start, edge.arrow_direction, color)
+}
+
+draw_arrow :: proc(pos: Vec2, direction: i32, color: rl.Color) {
 	// Draw an arrow at the given position, pointing in the specified direction
 	// The arrow is drawn as a triangle with a base of 20 pixels and a height of 10 pixels
 	arrow_base: f32 = 20.0
@@ -254,7 +281,7 @@ draw_arrow :: proc(pos: Vec2, direction: i32) {
 	}
 
 	// Draw the arrow triangle
-	rl.DrawTriangle(pos, upper_right, upper_left, rl.RED)
+	rl.DrawTriangle(pos, upper_right, upper_left, color)
 }
 // Helper procs, mainly for repeated conversions
 
