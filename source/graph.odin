@@ -98,7 +98,7 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 		}
 	}
 
-	layer_filling := make(map[i32][dynamic]NodeHandle)
+	layer_filling := make([][dynamic]NodeHandle, y_max + 1)
 	for node_handle in layers {
 		node := hm.get(&graph.nodes, node_handle)
 		layer := layer_filling[node.position.y]
@@ -107,7 +107,7 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 	}
 
 	x_max: i32 = 0
-	for _, nodes in layer_filling {
+	for nodes in layer_filling {
 		for node_handle, idx in nodes {
 			node := hm.get(&graph.nodes, node_handle)
 			node.position.x = i32(idx)
