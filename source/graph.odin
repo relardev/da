@@ -96,39 +96,17 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 		layers[node.position.y] = layer
 	}
 
-	x_max: i32 = 0
-	for layer in layers {
-		center_struct :: struct {
-			handle: NodeHandle,
-			center: f32,
-		}
-		centers := make([]center_struct, len(layer), allocator = context.temp_allocator)
-
-		for node_handle, idx in layer {
-			node := hm.get(&graph.nodes, node_handle)
-			center := graph_calculate_nodes_barycenter(graph, node)
-			if center == -1 {
-				centers[idx] = center_struct {
-					handle = node_handle,
-					center = 999,
-				}
+	for i in 0 ..= 10 {
+		for layer in layers {
+			if i % 2 == 0 {
+				graph_unwind_crossings(graph, layer[:], true)
 			} else {
-				centers[idx] = center_struct {
-					handle = node_handle,
-					center = center,
-				}
+				graph_unwind_crossings(graph, layer[:], false)
 			}
-		}
-
-		slice.sort_by(centers, proc(a, b: center_struct) -> bool {
-			return a.center < b.center
-		})
-		for center, i in centers {
-			node := hm.get(&graph.nodes, center.handle)
-			node.position.x = i32(i)
 		}
 	}
 
+	x_max: i32 = 0
 	node_iter = hm.make_iter(&graph.nodes)
 	for node in hm.iter(&node_iter) {
 		if node.position.x > x_max {
@@ -284,6 +262,70 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 				edge.arrow_direction = left
 			}
 		}
+	}
+}
+
+graph_unwind_crossings :: proc(graph: ^Graph, layer: []NodeHandle, descending: bool) {
+	log.info("Unwinding crossings in layer: ", layer)
+	center_struct :: struct {
+		handle: NodeHandle,
+		center: f32,
+		pos:    f32,
+	}
+	centers := make([]center_struct, len(layer), allocator = context.temp_allocator)
+
+	loop := proc(graph: ^Graph, node_handle: NodeHandle, idx: int, centers: []center_struct) {
+		node := hm.get(&graph.nodes, node_handle)
+		center := graph_calculate_nodes_barycenter(graph, node)
+		centers[idx] = center_struct {
+			handle = node_handle,
+			center = center,
+			pos    = f32(idx),
+		}
+
+		log.info("Node: ", node.text, " Center: ", centers[idx].center)
+	}
+
+	if descending {
+		for node_handle, idx in layer {
+			loop(graph, node_handle, idx, centers)
+		}
+	} else {
+		for i := len(layer) - 1; i >= 0; i -= 1 {
+			loop(graph, layer[i], i, centers)
+		}
+	}
+
+	slice.sort_by(
+		centers,
+		proc(a, b: center_struct) -> bool {
+			if a.center == -1 && b.center == -1 {
+				return a.pos < b.pos // both have no center, sort by position
+			}
+
+			if a.center == -1 {
+				// make b go towards its center
+				direnction := b.pos - b.center
+				if direnction < 0 {
+					return true // b should go left
+				} else {
+					return false // b should go right
+				}
+			}
+			if b.center == -1 {
+				direnction := a.pos - a.center
+				if direnction < 0 {
+					return false // a should go right
+				} else {
+					return true // a should go left
+				}
+			}
+			return a.center < b.center
+		},
+	)
+	for center, i in centers {
+		node := hm.get(&graph.nodes, center.handle)
+		node.position.x = i32(i)
 	}
 }
 
