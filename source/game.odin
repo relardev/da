@@ -14,9 +14,9 @@ Game_Memory :: struct {
 	run:                     bool,
 	// Clay for UI
 	clay_ui_debug_mode:      bool,
-	clay_ui_memory:          rawptr, // Pointer to the clay memory allocator.
-	clay_ui_arena:           clay.Arena, // Arena for clay memory allocations.
-	// Clay for graph node size measurements.
+	clay_ui_memory:          rawptr,
+	clay_ui_arena:           clay.Arena,
+	clay_ui_context:         ^clay.Context,
 	raylib_fonts:            [dynamic]Raylib_Font,
 	prev_mouse_pos:          Vec2,
 	graph:                   Graph,
@@ -30,6 +30,7 @@ Game_Memory :: struct {
 g: ^Game_Memory
 
 update :: proc() {
+	clay.SetCurrentContext(g.clay_ui_context)
 	if rl.IsKeyPressed(.D) {
 		g.clay_ui_debug_mode = !g.clay_ui_debug_mode
 		clay.SetDebugModeEnabled(g.clay_ui_debug_mode)
@@ -122,21 +123,27 @@ errorHandler :: proc "c" (errorData: clay.ErrorData) {
 
 @(export)
 game_init :: proc() {
-	clay_min_memory_size := clay.MinMemorySize()
-	clay_memory := make([^]u8, clay_min_memory_size)
+	clay_ui_min_memory_size := clay.MinMemorySize()
+	clay_ui_memory := make([^]u8, clay_ui_min_memory_size)
+
 
 	g = new(Game_Memory)
 
 	g^ = Game_Memory {
 		run = true,
-		clay_ui_memory = clay_memory,
+		clay_ui_memory = clay_ui_memory,
 		clay_ui_arena = clay.CreateArenaWithCapacityAndMemory(
-			uint(clay_min_memory_size),
-			clay_memory,
+			uint(clay_ui_min_memory_size),
+			clay_ui_memory,
 		),
 		raylib_fonts = make([dynamic]Raylib_Font, 10),
 		graph = Graph{draw_nodes = true},
 	}
+
+	loadFont(FONT_ID_TITLE_16, 16, "assets/iosevka.ttf")
+	loadFont(FONT_ID_TITLE_24, 24, "assets/iosevka.ttf")
+	loadFont(FONT_ID_TITLE_32, 32, "assets/iosevka.ttf")
+	loadFont(FONT_ID_TITLE_56, 56, "assets/iosevka.ttf")
 
 	// n0 := hm.add(&g.graph.nodes, Node{text = "Node 0", size_px = {200, 200}})
 	// n1 := hm.add(&g.graph.nodes, Node{text = "Node 1"})
@@ -163,12 +170,22 @@ game_init :: proc() {
 	hm.add(&g.graph.edges, Edge{from = n1, to = n4})
 	hm.add(&g.graph.edges, Edge{from = n4, to = n3})
 
+	clya_node_min_memory_size := clay.MinMemorySize()
+	clay_node_memory := make([^]u8, clya_node_min_memory_size)
+	clay_node_arena := clay.CreateArenaWithCapacityAndMemory(
+		uint(clya_node_min_memory_size),
+		clay_node_memory,
+	)
+	clay.Initialize(clay_node_arena, {9999999, 9999999}, {handler = errorHandler})
+	clay.SetMeasureTextFunction(measure_text, nil)
+
+	fill_node_sizes()
+
 	graph_calculate_layout(&g.graph)
 
-	loadFont(FONT_ID_TITLE_16, 16, "assets/iosevka.ttf")
-	loadFont(FONT_ID_TITLE_24, 24, "assets/iosevka.ttf")
-	loadFont(FONT_ID_TITLE_32, 32, "assets/iosevka.ttf")
-	loadFont(FONT_ID_TITLE_56, 56, "assets/iosevka.ttf")
+	free(clay_node_memory)
+
+	clay.SetCurrentContext(g.clay_ui_context)
 
 	game_hot_reloaded(g)
 }
@@ -212,9 +229,7 @@ game_memory_size :: proc() -> int {
 game_hot_reloaded :: proc(mem: rawptr) {
 	g = (^Game_Memory)(mem)
 
-	// Here you can also set your own global variables. A good idea is to make
-	// your global variables into pointers that point to something inside `g`.
-	clay.Initialize(
+	g.clay_ui_context = clay.Initialize(
 		g.clay_ui_arena,
 		{cast(f32)rl.GetScreenWidth(), cast(f32)rl.GetScreenHeight()},
 		{handler = errorHandler},

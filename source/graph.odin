@@ -202,7 +202,7 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 		node.position_px = graph_get_node_position_px(graph, node.position)
 	}
 
-	graph_print_gutter(graph)
+	// graph_print_gutter(graph)
 
 	// Fill edge segments
 	{

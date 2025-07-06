@@ -100,6 +100,13 @@ button_component :: proc(id: clay.ElementId, $text: string) {
 	}
 }
 
+layout_node_core :: proc(node: ^Node) {
+	clay.TextDynamic(
+		node.text,
+		clay.TextConfig({textColor = BLACK, fontSize = 24, fontId = FONT_ID_TITLE_24}),
+	)
+}
+
 layout_node_component :: proc(node: ^Node) {
 	id := clay.ID("Node", node.handle.idx)
 	node.clay_id = id
@@ -146,10 +153,7 @@ layout_node_component :: proc(node: ^Node) {
 		border = border,
 	},
 	) {
-		clay.TextDynamic(
-			node.text,
-			clay.TextConfig({textColor = BLACK, fontSize = 24, fontId = FONT_ID_TITLE_24}),
-		)
+		layout_node_core(node)
 	}
 }
 
