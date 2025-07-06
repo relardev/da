@@ -72,35 +72,24 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 
 	assert(len(cycled) == 0, "Graph contains cycles")
 
-	layers := make(map[NodeHandle]i32, hm.num_used(graph.nodes))
-	for node in nodes_sorted {
-		max_prev: i32 = 0
-		has_pred := false
-		for u in graph_predecessors_of(graph, node) {
-			has_pred = true
-			if layers[u] + 1 > max_prev {
-				max_prev = layers[u] + 1
-			}
-		}
-		if has_pred {
-			layers[node] = max_prev
-		} else {
-			layers[node] = 0
-		}
-	}
+	layer_filling := make([dynamic][dynamic]NodeHandle, hm.num_used(graph.nodes))
 
 	y_max: i32 = 0
-	for node_handle, layer in layers {
-		node := hm.get(&graph.nodes, node_handle)
-		node.position.y = layer
-		if layer > y_max {
-			y_max = layer
+	for node_handle in nodes_sorted {
+		max_prev: i32 = 0
+		for pre_node_handle in graph_predecessors_of(graph, node_handle) {
+			pred_node := hm.get(&graph.nodes, pre_node_handle)
+			if pred_node.position.y + 1 > max_prev {
+				max_prev = pred_node.position.y + 1
+			}
 		}
-	}
 
-	layer_filling := make([][dynamic]NodeHandle, y_max + 1)
-	for node_handle in layers {
 		node := hm.get(&graph.nodes, node_handle)
+		node.position.y = max_prev
+		if max_prev > y_max {
+			y_max = max_prev
+		}
+
 		layer := layer_filling[node.position.y]
 		append(&layer, node_handle)
 		layer_filling[node.position.y] = layer
