@@ -12,7 +12,6 @@ Vec2i :: [2]i32
 
 Game_Memory :: struct {
 	run:                     bool,
-	// Clay for UI
 	clay_ui_debug_mode:      bool,
 	clay_ui_memory:          rawptr,
 	clay_ui_arena:           clay.Arena,
@@ -26,6 +25,7 @@ Game_Memory :: struct {
 	graph_drawing_offset:    Vec2,
 	graph_editor_id:         clay.ElementId,
 	pasted:                  [4096]u8,
+	pasted_len:              i32,
 }
 
 g: ^Game_Memory

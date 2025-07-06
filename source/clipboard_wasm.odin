@@ -13,6 +13,8 @@ import "core:c"
 paste_callback :: proc "c" (len: c.int) {
 	context = runtime.default_context()
 	g.pasted[len] = 0
+	g.paste_len = len + 1
+	clipboard_after_paste()
 }
 
 foreign _ {

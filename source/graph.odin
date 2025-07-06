@@ -266,7 +266,6 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 }
 
 graph_unwind_crossings :: proc(graph: ^Graph, layer: []NodeHandle, descending: bool) {
-	log.info("Unwinding crossings in layer: ", layer)
 	center_struct :: struct {
 		handle: NodeHandle,
 		center: f32,
@@ -283,7 +282,6 @@ graph_unwind_crossings :: proc(graph: ^Graph, layer: []NodeHandle, descending: b
 			pos    = f32(idx),
 		}
 
-		log.info("Node: ", node.text, " Center: ", centers[idx].center)
 	}
 
 	if descending {
