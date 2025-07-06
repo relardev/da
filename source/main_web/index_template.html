@@ -43,6 +43,29 @@
 					...imports
 				}
 
+				newImports.env.js_paste_from_clipboard = function(ptr) {
+						// Ensure a user gesture triggers this function!
+						navigator.clipboard.readText().then(function(text) {
+								// Convert text to UTF-8 bytes
+								// let text = "This is a test";
+								if (text.length >= 4096) {
+									console.error("Text too long for clipboard paste callback");
+									return; // Prevent buffer overflow
+								}
+								const encoder = new TextEncoder();
+								const utf8 = encoder.encode(text);
+
+								// Write bytes to WASM memory
+								const wasmMemory = odinMemoryInterface.memory;
+								const memView = new Uint8Array(wasmMemory.buffer, ptr, utf8.length);
+								memView.set(utf8);
+
+								// Odin callback, must be exported (e.g., @(export, link_name="paste_callback"))
+								const paste_callback = odinMemoryInterface.exports.paste_callback;
+								paste_callback(utf8.length);
+						});
+				};
+
 				return WebAssembly.instantiateStreaming(fetch("index.wasm"), newImports).then(function(output) {
 					var e = output.instance.exports;
 					odinMemoryInterface.setExports(e);

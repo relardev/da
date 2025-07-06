@@ -25,6 +25,7 @@ Game_Memory :: struct {
 	graph_highlighted_edges: []EdgeHandle,
 	graph_drawing_offset:    Vec2,
 	graph_editor_id:         clay.ElementId,
+	pasted:                  [4096]u8,
 }
 
 g: ^Game_Memory
@@ -85,6 +86,10 @@ update :: proc() {
 		}
 	}
 
+	if rl.IsKeyPressed(.V) && rl.IsKeyDown(.LEFT_CONTROL) {
+		clipboard_paste()
+	}
+
 	clay.SetPointerState(rl.GetMousePosition(), rl.IsMouseButtonDown(rl.MouseButton.LEFT))
 	clay.UpdateScrollContainers(false, rl.GetMouseWheelMoveV(), rl.GetFrameTime())
 	clay.SetLayoutDimensions({cast(f32)rl.GetScreenWidth(), cast(f32)rl.GetScreenHeight()})
@@ -95,6 +100,7 @@ draw :: proc() {
 	rl.BeginDrawing()
 	clay_raylib_render(&render_commands)
 	rl.DrawFPS(10, 10)
+	rl.DrawText(cstring(&g.pasted[0]), 10, rl.GetScreenHeight() - 30, 20, rl.BLACK)
 	rl.EndDrawing()
 }
 
