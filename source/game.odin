@@ -12,9 +12,11 @@ Vec2i :: [2]i32
 
 Game_Memory :: struct {
 	run:                     bool,
-	clay_debug_mode:         bool,
-	clay_memory:             rawptr, // Pointer to the clay memory allocator.
-	clay_arena:              clay.Arena, // Arena for clay memory allocations.
+	// Clay for UI
+	clay_ui_debug_mode:      bool,
+	clay_ui_memory:          rawptr, // Pointer to the clay memory allocator.
+	clay_ui_arena:           clay.Arena, // Arena for clay memory allocations.
+	// Clay for graph node size measurements.
 	raylib_fonts:            [dynamic]Raylib_Font,
 	prev_mouse_pos:          Vec2,
 	graph:                   Graph,
@@ -29,8 +31,8 @@ g: ^Game_Memory
 
 update :: proc() {
 	if rl.IsKeyPressed(.D) {
-		g.clay_debug_mode = !g.clay_debug_mode
-		clay.SetDebugModeEnabled(g.clay_debug_mode)
+		g.clay_ui_debug_mode = !g.clay_ui_debug_mode
+		clay.SetDebugModeEnabled(g.clay_ui_debug_mode)
 	}
 
 	if rl.IsKeyPressed(.ESCAPE) {
@@ -127,8 +129,8 @@ game_init :: proc() {
 
 	g^ = Game_Memory {
 		run = true,
-		clay_memory = clay_memory,
-		clay_arena = clay.CreateArenaWithCapacityAndMemory(
+		clay_ui_memory = clay_memory,
+		clay_ui_arena = clay.CreateArenaWithCapacityAndMemory(
 			uint(clay_min_memory_size),
 			clay_memory,
 		),
@@ -143,7 +145,7 @@ game_init :: proc() {
 	// hm.add(&g.graph.edges, Edge{from = n0, to = n1})
 	// hm.add(&g.graph.edges, Edge{from = n2, to = n1})
 
-	n0 := hm.add(&g.graph.nodes, Node{text = "Node 0", size_px = {200, 200}})
+	n0 := hm.add(&g.graph.nodes, Node{text = "Node 0", size_px = {300, 200}})
 	n02 := hm.add(&g.graph.nodes, Node{text = "Node 02"})
 	n1 := hm.add(&g.graph.nodes, Node{text = "Node 1"})
 	n2 := hm.add(&g.graph.nodes, Node{text = "Node 2"})
@@ -185,7 +187,7 @@ game_should_run :: proc() -> bool {
 
 @(export)
 game_shutdown :: proc() {
-	free(g.clay_memory)
+	free(g.clay_ui_memory)
 	delete(g.raylib_fonts)
 	graph_close(&g.graph)
 	free(g)
@@ -213,7 +215,7 @@ game_hot_reloaded :: proc(mem: rawptr) {
 	// Here you can also set your own global variables. A good idea is to make
 	// your global variables into pointers that point to something inside `g`.
 	clay.Initialize(
-		g.clay_arena,
+		g.clay_ui_arena,
 		{cast(f32)rl.GetScreenWidth(), cast(f32)rl.GetScreenHeight()},
 		{handler = errorHandler},
 	)
