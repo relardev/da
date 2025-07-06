@@ -3,6 +3,7 @@ package game
 import clay "clay-odin"
 import ts "core:container/topological_sort"
 import "core:log"
+import "core:slice"
 import hm "handle_map"
 
 gutter_edge_distance: f32 = 10.0 // distance between edges in gutters
@@ -72,7 +73,7 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 
 	assert(len(cycled) == 0, "Graph contains cycles")
 
-	layer_filling := make([dynamic][dynamic]NodeHandle, hm.num_used(graph.nodes))
+	layers := make([dynamic][dynamic]NodeHandle, hm.num_used(graph.nodes))
 
 	y_max: i32 = 0
 	for node_handle in nodes_sorted {
@@ -90,22 +91,50 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 			y_max = max_prev
 		}
 
-		layer := layer_filling[node.position.y]
+		layer := layers[node.position.y]
 		append(&layer, node_handle)
-		layer_filling[node.position.y] = layer
+		layers[node.position.y] = layer
 	}
 
 	x_max: i32 = 0
-	for nodes in layer_filling {
-		for node_handle, idx in nodes {
+	for layer in layers {
+		center_struct :: struct {
+			handle: NodeHandle,
+			center: f32,
+		}
+		centers := make([]center_struct, len(layer), allocator = context.temp_allocator)
+
+		for node_handle, idx in layer {
 			node := hm.get(&graph.nodes, node_handle)
-			node.position.x = i32(idx)
-			if i32(idx) > x_max {
-				x_max = i32(idx)
+			center := graph_calculate_nodes_barycenter(graph, node)
+			if center == -1 {
+				centers[idx] = center_struct {
+					handle = node_handle,
+					center = 999,
+				}
+			} else {
+				centers[idx] = center_struct {
+					handle = node_handle,
+					center = center,
+				}
 			}
+		}
+
+		slice.sort_by(centers, proc(a, b: center_struct) -> bool {
+			return a.center < b.center
+		})
+		for center, i in centers {
+			node := hm.get(&graph.nodes, center.handle)
+			node.position.x = i32(i)
 		}
 	}
 
+	node_iter = hm.make_iter(&graph.nodes)
+	for node in hm.iter(&node_iter) {
+		if node.position.x > x_max {
+			x_max = node.position.x
+		}
+	}
 	graph.gutters_vertical = make([dynamic]Gutter, x_max + 2, allocator = main_allocator)
 	graph.gutters_horizontal = make([dynamic]Gutter, y_max + 2, allocator = main_allocator)
 
@@ -256,6 +285,20 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 			}
 		}
 	}
+}
+
+graph_calculate_nodes_barycenter :: proc(graph: ^Graph, node: ^Node) -> f32 {
+	sum: f32 = 0
+	preds := graph_predecessors_of(graph, node.handle)
+	for pred in preds {
+		pred_node := hm.get(&graph.nodes, pred)
+		sum += f32(pred_node.position.x)
+	}
+
+	if len(preds) == 0 {
+		return -1
+	}
+	return sum / f32(len(preds))
 }
 
 graph_horizontal_lane_for_edge :: proc(graph: ^Graph, gutter: ^Gutter, edge: ^Edge) -> i32 {
