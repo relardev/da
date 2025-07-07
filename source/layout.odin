@@ -47,40 +47,6 @@ COLOR_EDGE := BURNT_SIENNA
 COLOR_EDGE_H := WHITE
 COLOR_EDGE_L := BURNT_SIENNA_L
 
-sidebar_item_layout := clay.LayoutConfig {
-	sizing = {width = clay.SizingGrow({}), height = clay.SizingFixed(50)},
-	childAlignment = {y = .Center},
-	padding = {8, 8, 0, 0},
-}
-
-block_type :: enum {
-	Trigger,
-	Conditions,
-	Actions,
-}
-
-block_type_name := [block_type]string {
-	.Trigger    = "Trigger",
-	.Conditions = "Conditions",
-	.Actions    = "Actions",
-}
-
-sidebar_item_component :: proc(bt: block_type) {
-	label := block_type_name[bt]
-	if clay.UI()(
-	{
-		id = clay.ID("SidebarBlob", u32(bt)),
-		layout = sidebar_item_layout,
-		backgroundColor = COLOR_BACKGROUND_H,
-	},
-	) {
-		clay.TextDynamic(
-			label,
-			clay.TextConfig({textColor = BLACK, fontSize = 16, fontId = FONT_ID_TITLE_16}),
-		)
-	}
-}
-
 button_component :: proc(id: clay.ElementId, $text: string) {
 	if clay.UI()(
 	{
@@ -101,10 +67,26 @@ button_component :: proc(id: clay.ElementId, $text: string) {
 }
 
 layout_node_core :: proc(node: ^Node) {
-	clay.TextDynamic(
-		node.text,
-		clay.TextConfig({textColor = BLACK, fontSize = 24, fontId = FONT_ID_TITLE_24}),
-	)
+	if clay.UI()(
+	{
+		id = clay.ID("NodeCore", node.handle.idx),
+		layout = {
+			sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})},
+			layoutDirection = .TopToBottom,
+			padding = {16, 16, 16, 16},
+			childGap = 16,
+		},
+	},
+	) {
+		clay.TextDynamic(
+			node.text,
+			clay.TextConfig({textColor = BLACK, fontSize = 24, fontId = FONT_ID_TITLE_24}),
+		)
+		clay.TextDynamic(
+			node.type,
+			clay.TextConfig({textColor = BLACK, fontSize = 24, fontId = FONT_ID_TITLE_24}),
+		)
+	}
 }
 
 layout_node_component :: proc(node: ^Node) {
@@ -170,7 +152,7 @@ create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
 			childGap = 16,
 			layoutDirection = .TopToBottom,
 		},
-		backgroundColor = {250, 250, 255, 255},
+		backgroundColor = COLOR_BACKGROUND_L,
 	},
 	) {
 		if clay.UI()(
@@ -180,41 +162,50 @@ create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
 				childGap = 16,
 				sizing = {width = clay.SizingGrow({}), height = clay.SizingFixed(50)},
 			},
+			cornerRadius = {topLeft = 8, topRight = 8, bottomLeft = 0, bottomRight = 0},
 			backgroundColor = COLOR_BACKGROUND,
 		},
 		) {
-			if clay.UI()(
-			{
-				id = clay.ID("RecipeType"),
-				layout = {
-					sizing = {width = clay.SizingFit({}), height = clay.SizingGrow({})},
-					padding = {8, 8, 0, 0},
-					childAlignment = {y = .Center},
+			if g.recipe.Name != "" || g.recipe.Type != "" {
+				if clay.UI()(
+				{
+					id = clay.ID("RecipeType"),
+					layout = {
+						sizing = {width = clay.SizingFit({}), height = clay.SizingGrow({})},
+						padding = {8, 8, 0, 0},
+						childAlignment = {y = .Center},
+					},
+					cornerRadius = {topLeft = 8, topRight = 8, bottomLeft = 0, bottomRight = 0},
+					backgroundColor = BURNT_SIENNA,
 				},
-				backgroundColor = BURNT_SIENNA,
-			},
-			) {
-				clay.TextDynamic(
-					g.recipe.Type,
-					clay.TextConfig({textColor = BLACK, fontSize = 32, fontId = FONT_ID_TITLE_32}),
-				)
-			}
+				) {
+					clay.TextDynamic(
+						g.recipe.Type,
+						clay.TextConfig(
+							{textColor = BLACK, fontSize = 32, fontId = FONT_ID_TITLE_32},
+						),
+					)
+				}
 
-			if clay.UI()(
-			{
-				id = clay.ID("RecipeName"),
-				layout = {
-					sizing = {width = clay.SizingFit({}), height = clay.SizingGrow({})},
-					padding = {8, 8, 0, 0},
-					childAlignment = {y = .Center},
+				if clay.UI()(
+				{
+					id = clay.ID("RecipeName"),
+					layout = {
+						sizing = {width = clay.SizingFit({}), height = clay.SizingGrow({})},
+						padding = {8, 8, 0, 0},
+						childAlignment = {y = .Center},
+					},
+					cornerRadius = {topLeft = 8, topRight = 8, bottomLeft = 0, bottomRight = 0},
+					backgroundColor = BURNT_SIENNA,
 				},
-				backgroundColor = BURNT_SIENNA,
-			},
-			) {
-				clay.TextDynamic(
-					g.recipe.Name,
-					clay.TextConfig({textColor = BLACK, fontSize = 32, fontId = FONT_ID_TITLE_32}),
-				)
+				) {
+					clay.TextDynamic(
+						g.recipe.Name,
+						clay.TextConfig(
+							{textColor = BLACK, fontSize = 32, fontId = FONT_ID_TITLE_32},
+						),
+					)
+				}
 			}
 
 			if clay.UI()(
@@ -223,100 +214,29 @@ create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
 				layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})}},
 			},
 			) {}
-			button_component(clay.ID("Activate"), "Activate")
-			button_component(clay.ID("SaveButton"), "Save")
-			button_component(clay.ID("SaveAsButton"), "Save As")
-			button_component(clay.ID("DetailsButton"), "Details")
-			if clay.UI()(
-			{
-				id = clay.ID("TopBarSpacer"),
-				layout = {
-					sizing = {width = clay.SizingFixed(10), height = clay.SizingGrow({})},
-					childAlignment = {y = .Center},
-				},
-			},
-			) {
-				clay.Text(
-					"|",
-					clay.TextConfig({textColor = BLACK, fontSize = 16, fontId = FONT_ID_TITLE_16}),
-				)
-			}
-			button_component(clay.ID("DeleteButton"), "Delete")
 		}
+		g.graph_editor_id = clay.ID("GraphEditor")
 		if clay.UI()(
 		{
-			id = clay.ID("WorkflowEditor"),
-			layout = {
-				sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})},
-				padding = {16, 16, 16, 16},
-				childGap = 16,
-			},
+			id = g.graph_editor_id,
+			layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})}},
+			clip = {horizontal = true, vertical = true},
+			backgroundColor = COLOR_EDITOR_BACKGROUND,
 		},
 		) {
-			g.graph_editor_id = clay.ID("GraphEditor")
 			if clay.UI()(
 			{
-				id = g.graph_editor_id,
+				id = clay.ID("GraphEdges"),
 				layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})}},
-				clip = {horizontal = true, vertical = true},
-				backgroundColor = COLOR_EDITOR_BACKGROUND,
+				// passing g.graph is not necessary, but this doesn't work when i pass
+				custom = {customData = &g.graph},
 			},
-			) {
-				if clay.UI()(
-				{
-					id = clay.ID("GraphEdges"),
-					layout = {
-						sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})},
-					},
-					// passing g.graph is not necessary, but this doesn't work when i pass
-					custom = {customData = &g.graph},
-				},
-				) {}
+			) {}
 
-				if g.graph.draw_nodes {
-					node_iter := hm.make_iter(&g.graph.nodes)
-					for node in hm.iter(&node_iter) {
-						layout_node_component(node)
-					}
-				}
-			}
-			if clay.UI()(
-			{
-				id = clay.ID("Blocks"),
-				layout = {
-					layoutDirection = .TopToBottom,
-					sizing = {width = clay.SizingFixed(300), height = clay.SizingGrow({})},
-					padding = {16, 16, 16, 16},
-					childGap = 16,
-				},
-				backgroundColor = COLOR_BACKGROUND,
-			},
-			) {
-				if clay.UI()(
-				{
-					id = clay.ID("SearchBlock"),
-					layout = {
-						sizing = {width = clay.SizingGrow({})},
-						padding = {16, 16, 16, 16},
-						childGap = 16,
-						childAlignment = {y = .Center},
-					},
-					backgroundColor = COLOR_BACKGROUND_L,
-					cornerRadius = {6, 6, 6, 6},
-				},
-				) {
-					clay.Text(
-						"Search:",
-						clay.TextConfig(
-							{textColor = BLACK, fontSize = 24, fontId = FONT_ID_TITLE_24},
-						),
-					)
-				}
-
-				// Standard Odin code like loops, etc. work inside components.
-				// Here we render 5 sidebar items.
-				for bt in block_type {
-					sidebar_item_component(bt)
+			if g.graph.draw_nodes {
+				node_iter := hm.make_iter(&g.graph.nodes)
+				for node in hm.iter(&node_iter) {
+					layout_node_component(node)
 				}
 			}
 		}

@@ -24,12 +24,13 @@ EdgeHandle :: hm.Handle
 
 Node :: struct {
 	handle:      NodeHandle,
-	text:        string,
 	position:    Vec2i,
 	position_px: Vec2,
 	size_px:     Vec2,
 	depth:       i32,
 	clay_id:     clay.ElementId,
+	text:        string,
+	type:        string,
 }
 
 down: i32 = 1
@@ -52,7 +53,7 @@ Gutter :: struct {
 
 graph_calculate_layout :: proc(graph: ^Graph) {
 	sorter: ts.Sorter(NodeHandle)
-	main_allocator := context.allocator
+	// main_allocator := context.allocator
 	context.allocator = context.temp_allocator
 	ts.init(&sorter)
 	defer ts.destroy(&sorter)
@@ -113,8 +114,8 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 			x_max = node.position.x
 		}
 	}
-	graph.gutters_vertical = make([dynamic]Gutter, x_max + 2, allocator = main_allocator)
-	graph.gutters_horizontal = make([dynamic]Gutter, y_max + 2, allocator = main_allocator)
+	graph.gutters_vertical = make([dynamic]Gutter, x_max + 2, allocator = g.recipe_allocator)
+	graph.gutters_horizontal = make([dynamic]Gutter, y_max + 2, allocator = g.recipe_allocator)
 
 	// Calculate gutters sizes
 	{

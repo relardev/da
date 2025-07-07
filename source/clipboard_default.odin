@@ -5,6 +5,8 @@ package game
 import "core:mem"
 import rl "vendor:raylib"
 
+recipe_arena_align :: 8 * align_of(rawptr)
+
 clipboard_paste :: proc() {
 	txt := rl.GetClipboardText()
 	assert(len(txt) + 1 < len(g.pasted), "clipboard text too long")

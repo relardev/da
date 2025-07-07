@@ -17,6 +17,7 @@ Game_Memory :: struct {
 	clay_ui_memory:          rawptr,
 	clay_ui_arena:           clay.Arena,
 	clay_ui_context:         ^clay.Context,
+	clay_node_memory:        rawptr,
 	raylib_fonts:            [dynamic]Raylib_Font,
 	prev_mouse_pos:          Vec2,
 	graph:                   Graph,
@@ -62,8 +63,8 @@ update :: proc() {
 	// select, highlight nodes and edges
 	{
 		node_handle: NodeHandle
-		node_iter := hm.make_iter(&g.graph.nodes)
 		g.graph_selected_node = {}
+		node_iter := hm.make_iter(&g.graph.nodes)
 		for node in hm.iter(&node_iter) {
 			if clay.PointerOver(node.clay_id) {
 				g.graph_selected_node = node.clay_id
@@ -103,8 +104,8 @@ draw :: proc() {
 	render_commands: clay.ClayArray(clay.RenderCommand) = create_layout()
 	rl.BeginDrawing()
 	clay_raylib_render(&render_commands)
-	rl.DrawFPS(10, 10)
-	rl.DrawText(cstring(&g.pasted[0]), 10, rl.GetScreenHeight() - 30, 20, rl.BLACK)
+	// rl.DrawFPS(10, 10)
+	// rl.DrawText(cstring(&g.pasted[0]), 10, rl.GetScreenHeight() - 30, 20, rl.BLACK)
 	rl.EndDrawing()
 }
 
@@ -136,6 +137,8 @@ game_init :: proc() {
 	clay_ui_min_memory_size := clay.MinMemorySize()
 	clay_ui_memory := make([^]u8, clay_ui_min_memory_size)
 
+	clay_node_min_memory_size := clay.MinMemorySize()
+	clay_node_memory := make([^]u8, clay_node_min_memory_size)
 
 	g = new(Game_Memory)
 
@@ -146,11 +149,12 @@ game_init :: proc() {
 			uint(clay_ui_min_memory_size),
 			clay_ui_memory,
 		),
+		clay_node_memory = clay_node_memory,
 		raylib_fonts = make([dynamic]Raylib_Font, 10),
 		graph = Graph{draw_nodes = true},
 	}
 
-	mem.dynamic_arena_init(&g.recipe_arena, alignment = 8 * align_of(rawptr))
+	mem.dynamic_arena_init(&g.recipe_arena, alignment = recipe_arena_align)
 	g.recipe_allocator = mem.dynamic_arena_allocator(&g.recipe_arena)
 
 	g.recipe = new(Recipe, allocator = g.recipe_allocator)
@@ -178,6 +182,7 @@ game_should_run :: proc() -> bool {
 @(export)
 game_shutdown :: proc() {
 	free(g.clay_ui_memory)
+	free(g.clay_node_memory)
 	delete(g.raylib_fonts)
 	mem.dynamic_arena_destroy(&g.recipe_arena)
 	graph_close(&g.graph)

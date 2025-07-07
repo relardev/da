@@ -5,14 +5,11 @@ import hm "handle_map"
 
 fill_node_sizes :: proc() {
 	clya_node_min_memory_size := clay.MinMemorySize()
-	clay_node_memory := make([^]u8, clya_node_min_memory_size)
-	defer free(clay_node_memory)
 	clay_node_arena := clay.CreateArenaWithCapacityAndMemory(
 		uint(clya_node_min_memory_size),
-		clay_node_memory,
+		cast([^]u8)g.clay_node_memory,
 	)
 	clay.Initialize(clay_node_arena, {9999999, 9999999}, {handler = errorHandler})
-	defer clay.SetCurrentContext(g.clay_ui_context)
 	clay.SetMeasureTextFunction(measure_text, nil)
 	clay.BeginLayout()
 	if clay.UI()(
@@ -47,4 +44,6 @@ fill_node_sizes :: proc() {
 			node.size_px = {command.boundingBox.width, command.boundingBox.height}
 		}
 	}
+
+	clay.SetCurrentContext(g.clay_ui_context)
 }
