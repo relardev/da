@@ -2,6 +2,7 @@ package game
 
 import "base:runtime"
 import clay "clay-odin"
+import "core:mem"
 import hm "handle_map"
 import rl "vendor:raylib"
 
@@ -26,6 +27,9 @@ Game_Memory :: struct {
 	graph_editor_id:         clay.ElementId,
 	pasted:                  [4096]u8,
 	pasted_len:              i32,
+	recipe:                  ^Recipe,
+	recipe_arena:            mem.Dynamic_Arena,
+	recipe_allocator:        mem.Allocator,
 }
 
 g: ^Game_Memory
@@ -146,52 +150,15 @@ game_init :: proc() {
 		graph = Graph{draw_nodes = true},
 	}
 
+	mem.dynamic_arena_init(&g.recipe_arena, alignment = 8 * align_of(rawptr))
+	g.recipe_allocator = mem.dynamic_arena_allocator(&g.recipe_arena)
+
+	g.recipe = new(Recipe, allocator = g.recipe_allocator)
+
 	loadFont(FONT_ID_TITLE_16, 16, "assets/iosevka.ttf")
 	loadFont(FONT_ID_TITLE_24, 24, "assets/iosevka.ttf")
 	loadFont(FONT_ID_TITLE_32, 32, "assets/iosevka.ttf")
 	loadFont(FONT_ID_TITLE_56, 56, "assets/iosevka.ttf")
-
-	// n0 := hm.add(&g.graph.nodes, Node{text = "Node 0", size_px = {200, 200}})
-	// n1 := hm.add(&g.graph.nodes, Node{text = "Node 1"})
-	// n2 := hm.add(&g.graph.nodes, Node{text = "Node top2"})
-	//
-	// hm.add(&g.graph.edges, Edge{from = n0, to = n1})
-	// hm.add(&g.graph.edges, Edge{from = n2, to = n1})
-
-	n0 := hm.add(&g.graph.nodes, Node{text = "Node 0", size_px = {300, 200}})
-	n02 := hm.add(&g.graph.nodes, Node{text = "Node 02"})
-	n1 := hm.add(&g.graph.nodes, Node{text = "Node 1"})
-	n2 := hm.add(&g.graph.nodes, Node{text = "Node 2"})
-	n3 := hm.add(&g.graph.nodes, Node{text = "Node 3"})
-	n4 := hm.add(&g.graph.nodes, Node{text = "Node 4"})
-	hm.add(&g.graph.nodes, Node{text = "Node 5"})
-
-	hm.add(&g.graph.edges, Edge{from = n0, to = n1})
-	hm.add(&g.graph.edges, Edge{from = n1, to = n2})
-	hm.add(&g.graph.edges, Edge{from = n0, to = n2})
-	hm.add(&g.graph.edges, Edge{from = n02, to = n2})
-	hm.add(&g.graph.edges, Edge{from = n0, to = n3})
-	hm.add(&g.graph.edges, Edge{from = n1, to = n3})
-	hm.add(&g.graph.edges, Edge{from = n2, to = n3})
-	hm.add(&g.graph.edges, Edge{from = n1, to = n4})
-	hm.add(&g.graph.edges, Edge{from = n4, to = n3})
-
-	clya_node_min_memory_size := clay.MinMemorySize()
-	clay_node_memory := make([^]u8, clya_node_min_memory_size)
-	clay_node_arena := clay.CreateArenaWithCapacityAndMemory(
-		uint(clya_node_min_memory_size),
-		clay_node_memory,
-	)
-	clay.Initialize(clay_node_arena, {9999999, 9999999}, {handler = errorHandler})
-	clay.SetMeasureTextFunction(measure_text, nil)
-
-	fill_node_sizes()
-
-	graph_calculate_layout(&g.graph)
-
-	free(clay_node_memory)
-
-	clay.SetCurrentContext(g.clay_ui_context)
 
 	game_hot_reloaded(g)
 }
@@ -212,6 +179,7 @@ game_should_run :: proc() -> bool {
 game_shutdown :: proc() {
 	free(g.clay_ui_memory)
 	delete(g.raylib_fonts)
+	mem.dynamic_arena_destroy(&g.recipe_arena)
 	graph_close(&g.graph)
 	free(g)
 }

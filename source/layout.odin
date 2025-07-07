@@ -185,17 +185,34 @@ create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
 		) {
 			if clay.UI()(
 			{
-				id = clay.ID("Name"),
+				id = clay.ID("RecipeType"),
 				layout = {
-					sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})},
+					sizing = {width = clay.SizingFit({}), height = clay.SizingGrow({})},
 					padding = {8, 8, 0, 0},
 					childAlignment = {y = .Center},
 				},
 				backgroundColor = BURNT_SIENNA,
 			},
 			) {
-				clay.Text(
-					"WP Datapower | Zainteresowania | Styl i moda | Uroda | Pielegnacja i stylizacja paznokci",
+				clay.TextDynamic(
+					g.recipe.Type,
+					clay.TextConfig({textColor = BLACK, fontSize = 32, fontId = FONT_ID_TITLE_32}),
+				)
+			}
+
+			if clay.UI()(
+			{
+				id = clay.ID("RecipeName"),
+				layout = {
+					sizing = {width = clay.SizingFit({}), height = clay.SizingGrow({})},
+					padding = {8, 8, 0, 0},
+					childAlignment = {y = .Center},
+				},
+				backgroundColor = BURNT_SIENNA,
+			},
+			) {
+				clay.TextDynamic(
+					g.recipe.Name,
 					clay.TextConfig({textColor = BLACK, fontSize = 32, fontId = FONT_ID_TITLE_32}),
 				)
 			}
