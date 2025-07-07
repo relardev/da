@@ -17,6 +17,7 @@ Graph :: struct {
 	gutters_vertical:   [dynamic]Gutter,
 	gutters_horizontal: [dynamic]Gutter,
 	cell_size_px:       Vec2,
+	size_px:            Vec2,
 }
 
 NodeHandle :: hm.Handle
@@ -184,12 +185,14 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 			gutter.pos = previous_width
 			previous_width += gutter.size_px + graph.cell_size_px.x
 		}
+		graph.size_px.x = previous_width
 
 		previous_height: f32 = 0
 		for &gutter in graph.gutters_horizontal {
 			gutter.pos = previous_height
 			previous_height += gutter.size_px + graph.cell_size_px.y
 		}
+		graph.size_px.y = previous_height
 	}
 
 	// Fill node positions
@@ -397,6 +400,7 @@ graph_predecessors_of :: proc(
 	}
 	return preds[:]
 }
+
 graph_clay_connected_nodes :: proc(
 	graph: ^Graph,
 	node_handle: NodeHandle,

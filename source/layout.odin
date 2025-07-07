@@ -139,7 +139,8 @@ layout_node_component :: proc(node: ^Node) {
 	}
 }
 
-create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
+layout_ui_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
+	clay.SetCurrentContext(g.clay_ui_context)
 	clay.BeginLayout()
 	// An example of laying out a UI with a fixed-width sidebar and flexible-width main content
 	// NOTE: To create a scope for child components, the Odin API uses `if` with components that have children
@@ -215,21 +216,55 @@ create_layout :: proc() -> clay.ClayArray(clay.RenderCommand) {
 			},
 			) {}
 		}
-		g.graph_editor_id = clay.ID("GraphEditor")
+		g.graph_editor_id = clay.ID("GraphEditorOuter")
+		graph_viewer_data := new(CustomRenderData, allocator = context.temp_allocator)
+		graph_viewer_data.type = .graph_viewer
+		graph_viewer_data.data = GraphViewerData{}
 		if clay.UI()(
 		{
 			id = g.graph_editor_id,
 			layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})}},
+			backgroundColor = COLOR_EDITOR_BACKGROUND,
+			custom = {customData = graph_viewer_data},
+		},
+		) {}
+	}
+	return clay.EndLayout()
+}
+
+layout_graph_create :: proc(bounding_box: clay.BoundingBox) -> clay.ClayArray(clay.RenderCommand) {
+	clay.BeginLayout()
+	if clay.UI()(
+	{
+		id = clay.ID("GraphEditorOuter"),
+		layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})}},
+		floating = {clipTo = .AttachedParent, attachTo = .Parent},
+	},
+	) {
+		offset := Vec2{bounding_box.x, bounding_box.y}
+		g.graph_editor_id = clay.ID("GraphEditor")
+		if clay.UI()(
+		{
+			id = g.graph_editor_id,
+			layout = {
+				sizing = {
+					width = clay.SizingFixed(bounding_box.width),
+					height = clay.SizingFixed(bounding_box.height),
+				},
+			},
+			floating = {clipTo = .AttachedParent, attachTo = .Parent, offset = offset},
 			clip = {horizontal = true, vertical = true},
 			backgroundColor = COLOR_EDITOR_BACKGROUND,
 		},
 		) {
+			edges_data := new(CustomRenderData, allocator = context.temp_allocator)
+			edges_data.type = .edges
+			edges_data.data = EdgesData{}
 			if clay.UI()(
 			{
 				id = clay.ID("GraphEdges"),
 				layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})}},
-				// passing g.graph is not necessary, but this doesn't work when i pass
-				custom = {customData = &g.graph},
+				custom = {customData = edges_data},
 			},
 			) {}
 

@@ -44,6 +44,4 @@ fill_node_sizes :: proc() {
 			node.size_px = {command.boundingBox.width, command.boundingBox.height}
 		}
 	}
-
-	clay.SetCurrentContext(g.clay_ui_context)
 }

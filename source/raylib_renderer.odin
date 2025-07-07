@@ -2,6 +2,7 @@ package game
 
 import clay "clay-odin"
 import "core:fmt"
+import "core:log"
 import "core:math"
 import "core:strings"
 import hm "handle_map"
@@ -11,6 +12,26 @@ clay_color_to_rl_color :: proc(color: clay.Color) -> rl.Color {
 	return {u8(color.r), u8(color.g), u8(color.b), u8(color.a)}
 }
 
+
+CustomElementType :: enum {
+	graph_viewer,
+	edges,
+}
+
+GraphViewerData :: struct {}
+
+EdgesData :: struct {}
+
+CustomElementData :: union {
+	GraphViewerData,
+	EdgesData,
+}
+
+CustomRenderData :: struct {
+	type: CustomElementType,
+	data: CustomElementData,
+}
+
 clay_raylib_render :: proc(
 	render_commands: ^clay.ClayArray(clay.RenderCommand),
 	allocator := context.temp_allocator,
@@ -18,6 +39,8 @@ clay_raylib_render :: proc(
 	for i in 0 ..< render_commands.length {
 		render_command := clay.RenderCommandArray_Get(render_commands, i)
 		bounds := render_command.boundingBox
+
+		log.info(render_command.commandType, " at ", bounds)
 
 		switch render_command.commandType {
 		case .None: // None
@@ -169,75 +192,87 @@ clay_raylib_render :: proc(
 				)
 			}
 		case clay.RenderCommandType.Custom:
-			canvas_start := Vec2{bounds.x, bounds.y} + g.graph_drawing_offset
-
-			if g.graph.draw_gutters {
-				for gutter in g.graph.gutters_vertical {
-					rl.DrawText(
-						fmt.ctprintf("%d", len(gutter.edges)),
-						i32(canvas_start.x + gutter.pos + 5.0),
-						i32(canvas_start.y + 5),
-						20,
-						rl.BLACK,
-					)
-					rl.DrawRectangleLinesEx(
-						{
-							x = canvas_start.x + gutter.pos,
-							y = canvas_start.y,
-							width = gutter.size_px,
-							height = bounds.height,
-						},
-						2,
-						rl.GREEN,
-					)
-				}
-
-				for gutter in g.graph.gutters_horizontal {
-					rl.DrawText(
-						fmt.ctprintf("%d", len(gutter.edges)),
-						i32(canvas_start.x + 5),
-						i32(canvas_start.y + gutter.pos + 5.0),
-						20,
-						rl.BLACK,
-					)
-					rl.DrawRectangleLinesEx(
-						{
-							x = canvas_start.x,
-							y = canvas_start.y + gutter.pos,
-							width = bounds.width,
-							height = gutter.size_px,
-						},
-						2,
-						rl.BLUE,
-					)
-				}
-			}
-
-			if g.graph_selected_node != {} {
-				highlighted_edges := make(
-					[dynamic]Edge,
-					0,
-					len(g.graph_highlighted_edges),
-					allocator = context.temp_allocator,
+			render_command_data := cast(^CustomRenderData)render_command.renderData.custom.customData
+			switch render_command_data.type {
+			case .graph_viewer:
+				clay.SetCurrentContext(g.clay_graph_context)
+				graph_render_commands: clay.ClayArray(clay.RenderCommand) = layout_graph_create(
+					render_command.boundingBox,
 				)
+				log.info("Rendering graph")
+				clay_raylib_render(&graph_render_commands)
+				clay.SetCurrentContext(g.clay_ui_context)
+			case .edges:
+				canvas_start := Vec2{bounds.x, bounds.y} + g.graph_drawing_offset
 
-				edge_iter := hm.make_iter(&g.graph.edges)
-				not_highlighted: for edge in hm.iter(&edge_iter) {
-					for selected_edge in g.graph_highlighted_edges {
-						if selected_edge == edge.handle {
-							append(&highlighted_edges, edge^)
-							continue not_highlighted
-						}
+				if g.graph.draw_gutters {
+					for gutter in g.graph.gutters_vertical {
+						rl.DrawText(
+							fmt.ctprintf("%d", len(gutter.edges)),
+							i32(canvas_start.x + gutter.pos + 5.0),
+							i32(canvas_start.y + 5),
+							20,
+							rl.BLACK,
+						)
+						rl.DrawRectangleLinesEx(
+							{
+								x = canvas_start.x + gutter.pos,
+								y = canvas_start.y,
+								width = gutter.size_px,
+								height = bounds.height,
+							},
+							2,
+							rl.GREEN,
+						)
 					}
-					draw_edge(edge, canvas_start, clay_color_to_rl_color(COLOR_EDGE_L))
+
+					for gutter in g.graph.gutters_horizontal {
+						rl.DrawText(
+							fmt.ctprintf("%d", len(gutter.edges)),
+							i32(canvas_start.x + 5),
+							i32(canvas_start.y + gutter.pos + 5.0),
+							20,
+							rl.BLACK,
+						)
+						rl.DrawRectangleLinesEx(
+							{
+								x = canvas_start.x,
+								y = canvas_start.y + gutter.pos,
+								width = bounds.width,
+								height = gutter.size_px,
+							},
+							2,
+							rl.BLUE,
+						)
+					}
 				}
-				for &edge in highlighted_edges {
-					draw_edge(&edge, canvas_start, clay_color_to_rl_color(COLOR_EDGE_H))
-				}
-			} else {
-				edge_iter := hm.make_iter(&g.graph.edges)
-				for edge in hm.iter(&edge_iter) {
-					draw_edge(edge, canvas_start, clay_color_to_rl_color(COLOR_EDGE))
+
+				if g.graph_selected_node != {} {
+					highlighted_edges := make(
+						[dynamic]Edge,
+						0,
+						len(g.graph_highlighted_edges),
+						allocator = context.temp_allocator,
+					)
+
+					edge_iter := hm.make_iter(&g.graph.edges)
+					not_highlighted: for edge in hm.iter(&edge_iter) {
+						for selected_edge in g.graph_highlighted_edges {
+							if selected_edge == edge.handle {
+								append(&highlighted_edges, edge^)
+								continue not_highlighted
+							}
+						}
+						draw_edge(edge, canvas_start, clay_color_to_rl_color(COLOR_EDGE_L))
+					}
+					for &edge in highlighted_edges {
+						draw_edge(&edge, canvas_start, clay_color_to_rl_color(COLOR_EDGE_H))
+					}
+				} else {
+					edge_iter := hm.make_iter(&g.graph.edges)
+					for edge in hm.iter(&edge_iter) {
+						draw_edge(edge, canvas_start, clay_color_to_rl_color(COLOR_EDGE))
+					}
 				}
 			}
 		}

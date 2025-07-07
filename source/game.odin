@@ -17,6 +17,9 @@ Game_Memory :: struct {
 	clay_ui_memory:          rawptr,
 	clay_ui_arena:           clay.Arena,
 	clay_ui_context:         ^clay.Context,
+	clay_graph_memory:       rawptr,
+	clay_graph_arena:        clay.Arena,
+	clay_graph_context:      ^clay.Context,
 	clay_node_memory:        rawptr,
 	raylib_fonts:            [dynamic]Raylib_Font,
 	prev_mouse_pos:          Vec2,
@@ -36,7 +39,7 @@ Game_Memory :: struct {
 g: ^Game_Memory
 
 update :: proc() {
-	clay.SetCurrentContext(g.clay_ui_context)
+	clay.SetCurrentContext(g.clay_graph_context)
 	if rl.IsKeyPressed(.D) {
 		g.clay_ui_debug_mode = !g.clay_ui_debug_mode
 		clay.SetDebugModeEnabled(g.clay_ui_debug_mode)
@@ -95,15 +98,21 @@ update :: proc() {
 		clipboard_paste()
 	}
 
+	clay.SetCurrentContext(g.clay_ui_context)
+	clay.SetPointerState(rl.GetMousePosition(), rl.IsMouseButtonDown(rl.MouseButton.LEFT))
+	clay.UpdateScrollContainers(false, rl.GetMouseWheelMoveV(), rl.GetFrameTime())
+	clay.SetLayoutDimensions({cast(f32)rl.GetScreenWidth(), cast(f32)rl.GetScreenHeight()})
+	clay.SetCurrentContext(g.clay_graph_context)
 	clay.SetPointerState(rl.GetMousePosition(), rl.IsMouseButtonDown(rl.MouseButton.LEFT))
 	clay.UpdateScrollContainers(false, rl.GetMouseWheelMoveV(), rl.GetFrameTime())
 	clay.SetLayoutDimensions({cast(f32)rl.GetScreenWidth(), cast(f32)rl.GetScreenHeight()})
 }
 
 draw :: proc() {
-	render_commands: clay.ClayArray(clay.RenderCommand) = create_layout()
+	clay.SetCurrentContext(g.clay_ui_context)
+	ui_render_commands: clay.ClayArray(clay.RenderCommand) = layout_ui_create()
 	rl.BeginDrawing()
-	clay_raylib_render(&render_commands)
+	clay_raylib_render(&ui_render_commands)
 	// rl.DrawFPS(10, 10)
 	// rl.DrawText(cstring(&g.pasted[0]), 10, rl.GetScreenHeight() - 30, 20, rl.BLACK)
 	rl.EndDrawing()
@@ -134,11 +143,12 @@ errorHandler :: proc "c" (errorData: clay.ErrorData) {
 
 @(export)
 game_init :: proc() {
-	clay_ui_min_memory_size := clay.MinMemorySize()
-	clay_ui_memory := make([^]u8, clay_ui_min_memory_size)
+	clay_min_memory_size := clay.MinMemorySize()
+	clay_ui_memory := make([^]u8, clay_min_memory_size)
 
-	clay_node_min_memory_size := clay.MinMemorySize()
-	clay_node_memory := make([^]u8, clay_node_min_memory_size)
+	clay_graph_memory := make([^]u8, clay_min_memory_size)
+
+	clay_node_memory := make([^]u8, clay_min_memory_size)
 
 	g = new(Game_Memory)
 
@@ -146,8 +156,13 @@ game_init :: proc() {
 		run = true,
 		clay_ui_memory = clay_ui_memory,
 		clay_ui_arena = clay.CreateArenaWithCapacityAndMemory(
-			uint(clay_ui_min_memory_size),
+			uint(clay_min_memory_size),
 			clay_ui_memory,
+		),
+		clay_graph_memory = clay_graph_memory,
+		clay_graph_arena = clay.CreateArenaWithCapacityAndMemory(
+			uint(clay_min_memory_size),
+			clay_graph_memory,
 		),
 		clay_node_memory = clay_node_memory,
 		raylib_fonts = make([dynamic]Raylib_Font, 10),
@@ -182,6 +197,7 @@ game_should_run :: proc() -> bool {
 @(export)
 game_shutdown :: proc() {
 	free(g.clay_ui_memory)
+	free(g.clay_graph_memory)
 	free(g.clay_node_memory)
 	delete(g.raylib_fonts)
 	mem.dynamic_arena_destroy(&g.recipe_arena)
@@ -210,6 +226,13 @@ game_hot_reloaded :: proc(mem: rawptr) {
 
 	g.clay_ui_context = clay.Initialize(
 		g.clay_ui_arena,
+		{cast(f32)rl.GetScreenWidth(), cast(f32)rl.GetScreenHeight()},
+		{handler = errorHandler},
+	)
+	clay.SetMeasureTextFunction(measure_text, nil)
+
+	g.clay_graph_context = clay.Initialize(
+		g.clay_graph_arena,
 		{cast(f32)rl.GetScreenWidth(), cast(f32)rl.GetScreenHeight()},
 		{handler = errorHandler},
 	)
