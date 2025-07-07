@@ -26,7 +26,7 @@ Game_Memory :: struct {
 	graph_highlighted_edges: []EdgeHandle,
 	graph_drawing_offset:    Vec2,
 	graph_editor_id:         clay.ElementId,
-	pasted:                  [4096]u8,
+	pasted:                  [8 * mem.Kilobyte]u8,
 	pasted_len:              i32,
 	recipe:                  ^Recipe,
 	recipe_arena:            mem.Dynamic_Arena,
