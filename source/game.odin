@@ -186,7 +186,9 @@ draw :: proc() {
 	ui_render_commands: clay.ClayArray(clay.RenderCommand) = layout_ui_create()
 	rl.BeginDrawing()
 	clay_raylib_render(&ui_render_commands)
-	// rl.DrawFPS(10, 10)
+	if g.debug_show {
+		rl.DrawFPS(10, 10)
+	}
 	for msg, i in g.debug_observe {
 		rl.DrawText(msg, 10, rl.GetScreenHeight() - 30 * i32(i + 1), 20, rl.WHITE)
 	}

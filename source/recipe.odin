@@ -9,10 +9,15 @@ clipboard_after_paste :: proc() {
 }
 
 recipe_create_from_clipboard :: proc() {
+	hm.clear(&g.graph.nodes)
+	hm.clear(&g.graph.edges)
+
 	mem.dynamic_arena_free_all(&g.recipe_arena)
 	g.recipe = new(Recipe, allocator = g.recipe_allocator)
 	err := json.unmarshal(g.pasted[:g.pasted_len + 1], g.recipe, allocator = g.recipe_allocator)
-	assert(err == nil, "Failed to parse JSON data")
+	if err != nil {
+		return
+	}
 
 	// n0 := hm.add(&g.graph.nodes, Node{text = "Node 0", size_px = {200, 200}})
 	// n1 := hm.add(&g.graph.nodes, Node{text = "Node 1"})
@@ -20,6 +25,7 @@ recipe_create_from_clipboard :: proc() {
 	//
 	// hm.add(&g.graph.edges, Edge{from = n0, to = n1})
 	// hm.add(&g.graph.edges, Edge{from = n2, to = n1})
+
 
 	for name, node_def in g.recipe.Nodes {
 		hm.add(&g.graph.nodes, Node{text = name, type = node_def.Type})
