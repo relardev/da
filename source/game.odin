@@ -2,11 +2,14 @@ package game
 
 import "base:runtime"
 import clay "clay-odin"
+import "core:fmt"
 import "core:mem"
 import hm "handle_map"
 import rl "vendor:raylib"
 
-PIXEL_WINDOW_HEIGHT :: 180
+ZOOM_SPEED: f32 = 0.1
+MIN_ZOOM: f32 = 0.1
+MAX_ZOOM: f32 = 10
 
 Vec2 :: [2]f32
 Vec2i :: [2]i32
@@ -27,85 +30,155 @@ Game_Memory :: struct {
 	graph_selected_node:     clay.ElementId,
 	graph_highlighted_nodes: []clay.ElementId,
 	graph_highlighted_edges: []EdgeHandle,
-	graph_drawing_offset:    Vec2,
 	graph_editor_id:         clay.ElementId,
 	pasted:                  [8 * mem.Kilobyte]u8,
 	pasted_len:              i32,
 	recipe:                  ^Recipe,
 	recipe_arena:            mem.Dynamic_Arena,
 	recipe_allocator:        mem.Allocator,
+	camera:                  rl.Camera2D,
+	graph_offset:            Vec2,
+	debug_show:              bool,
+	debug_observe:           [dynamic]cstring,
+	debug_draw_camera:       bool,
 }
 
 g: ^Game_Memory
 
 update :: proc() {
-	clay.SetCurrentContext(g.clay_graph_context)
-	if rl.IsKeyPressed(.D) {
-		g.clay_ui_debug_mode = !g.clay_ui_debug_mode
-		clay.SetDebugModeEnabled(g.clay_ui_debug_mode)
-	}
+	// Update that happen no matter where the mouse is
+	{
+		g.debug_observe = make([dynamic]cstring, 0, 100, allocator = context.temp_allocator)
+		if rl.IsKeyPressed(.D) {
+			g.clay_ui_debug_mode = !g.clay_ui_debug_mode
+			clay.SetDebugModeEnabled(g.clay_ui_debug_mode)
+		}
 
-	if rl.IsKeyPressed(.ESCAPE) {
-		g.run = false
-	}
+		if rl.IsKeyPressed(.ESCAPE) {
+			g.run = false
+		}
 
-	if rl.IsKeyPressed(.F4) {
-		g.graph.draw_gutters = !g.graph.draw_gutters
-	}
-	if rl.IsKeyPressed(.F3) {
-		g.graph.draw_nodes = !g.graph.draw_nodes
+		if rl.IsKeyPressed(.F4) {
+			g.graph.draw_gutters = !g.graph.draw_gutters
+		}
+		if rl.IsKeyPressed(.F3) {
+			g.graph.draw_nodes = !g.graph.draw_nodes
+		}
+
+		if rl.IsKeyPressed(.F2) {
+			g.debug_draw_camera = !g.debug_draw_camera
+		}
+		if g.debug_draw_camera {
+			observe_debug(
+				fmt.ctprintf(
+					"Camera: [%.2f, %.2f], zoom: %.2f",
+					g.camera.target.x,
+					g.camera.target.y,
+					g.camera.zoom,
+				),
+			)
+		}
+
+		if rl.IsKeyPressed(.F1) {
+			g.debug_show = !g.debug_show
+		}
+
+		if rl.IsKeyPressed(.V) && rl.IsKeyDown(.LEFT_CONTROL) {
+			clipboard_paste()
+		}
 	}
 
 	mouse_pos := rl.GetMousePosition()
-	if clay.PointerOver(g.graph_editor_id) && rl.IsMouseButtonDown(.LEFT) {
-		delta := g.prev_mouse_pos - mouse_pos
-		g.graph_drawing_offset -= delta
-	}
-	g.prev_mouse_pos = mouse_pos
+	observe_debug(fmt.ctprintf("Mouse: [%.2f, %.2f]", mouse_pos.x, mouse_pos.y))
+	g.graph_selected_node = {}
+	clay.SetCurrentContext(g.clay_ui_context)
+	clay.SetPointerState(mouse_pos, rl.IsMouseButtonDown(rl.MouseButton.LEFT))
+	clay.SetLayoutDimensions({cast(f32)rl.GetScreenWidth(), cast(f32)rl.GetScreenHeight()})
+	is_pointer_over_editor := clay.PointerOver(g.graph_editor_id)
+	observe_debug(fmt.ctprintf("pointer over editor: %v", is_pointer_over_editor))
+	if is_pointer_over_editor {
+		// MOUSE IN GRAPH
+		observe_debug(fmt.ctprintf("graph offset: %v", g.graph_offset))
+		clay.SetCurrentContext(g.clay_graph_context)
+		mouse_in_graph_editor := rl.GetScreenToWorld2D(
+			mouse_pos - (g.graph_offset * g.camera.zoom),
+			g.camera,
+		)
+		observe_debug(
+			fmt.ctprintf(
+				"Graph Mouse: [%.2f, %.2f]",
+				mouse_in_graph_editor.x,
+				mouse_in_graph_editor.y,
+			),
+		)
+		clay.SetPointerState(mouse_in_graph_editor, rl.IsMouseButtonDown(rl.MouseButton.LEFT))
 
-	// select, highlight nodes and edges
-	{
-		node_handle: NodeHandle
-		g.graph_selected_node = {}
-		node_iter := hm.make_iter(&g.graph.nodes)
-		for node in hm.iter(&node_iter) {
-			if clay.PointerOver(node.clay_id) {
-				g.graph_selected_node = node.clay_id
-				node_handle = node.handle
-				break
+		// select, highlight nodes and edges
+		{
+			node_handle: NodeHandle
+			node_iter := hm.make_iter(&g.graph.nodes)
+			for node in hm.iter(&node_iter) {
+				if clay.PointerOver(node.clay_id) {
+					g.graph_selected_node = node.clay_id
+					node_handle = node.handle
+					break
+				}
+			}
+
+			if g.graph_selected_node != {} {
+				g.graph_highlighted_nodes = graph_clay_connected_nodes(
+					&g.graph,
+					node_handle,
+					context.temp_allocator,
+				)
+
+				g.graph_highlighted_edges = graph_edges_of(
+					&g.graph,
+					node_handle,
+					context.temp_allocator,
+				)
+			} else {
+				g.graph_highlighted_nodes = nil
+				g.graph_highlighted_edges = nil
 			}
 		}
 
-		if g.graph_selected_node != {} {
-			g.graph_highlighted_nodes = graph_clay_connected_nodes(
-				&g.graph,
-				node_handle,
-				context.temp_allocator,
-			)
-
-			g.graph_highlighted_edges = graph_edges_of(
-				&g.graph,
-				node_handle,
-				context.temp_allocator,
-			)
-		} else {
-			g.graph_highlighted_nodes = nil
-			g.graph_highlighted_edges = nil
+		// Pan
+		if rl.IsMouseButtonDown(.LEFT) {
+			delta := g.prev_mouse_pos - mouse_pos
+			g.camera.target += delta / g.camera.zoom
 		}
-	}
 
-	if rl.IsKeyPressed(.V) && rl.IsKeyDown(.LEFT_CONTROL) {
-		clipboard_paste()
-	}
+		// Zoom
+		{
+			wheel := rl.GetMouseWheelMove()
+			if wheel != 0 {
+				g.camera.zoom += wheel * ZOOM_SPEED
+				g.camera.zoom = clamp(g.camera.zoom, MIN_ZOOM, MAX_ZOOM)
 
-	clay.SetCurrentContext(g.clay_ui_context)
-	clay.SetPointerState(rl.GetMousePosition(), rl.IsMouseButtonDown(rl.MouseButton.LEFT))
-	clay.UpdateScrollContainers(false, rl.GetMouseWheelMoveV(), rl.GetFrameTime())
-	clay.SetLayoutDimensions({cast(f32)rl.GetScreenWidth(), cast(f32)rl.GetScreenHeight()})
-	clay.SetCurrentContext(g.clay_graph_context)
-	clay.SetPointerState(rl.GetMousePosition(), rl.IsMouseButtonDown(rl.MouseButton.LEFT))
-	clay.UpdateScrollContainers(false, rl.GetMouseWheelMoveV(), rl.GetFrameTime())
-	clay.SetLayoutDimensions({cast(f32)rl.GetScreenWidth(), cast(f32)rl.GetScreenHeight()})
+				new_mouse_world_pos := rl.GetScreenToWorld2D(
+					mouse_pos - (g.graph_offset * g.camera.zoom),
+					g.camera,
+				)
+				g.camera.target += mouse_in_graph_editor - new_mouse_world_pos
+				observe_debug(
+					fmt.ctprintf(
+						"Zoom: %.2f, Mouse World Pos: [%.2f, %.2f], %.2f, %.2f",
+						g.camera.zoom,
+						new_mouse_world_pos.x,
+						new_mouse_world_pos.y,
+						mouse_in_graph_editor.x,
+						mouse_in_graph_editor.y,
+					),
+				)
+			}
+
+		}
+	} else {
+		// MOUSE IN UI
+		clay.UpdateScrollContainers(false, rl.GetMouseWheelMoveV(), rl.GetFrameTime())
+	}
+	g.prev_mouse_pos = mouse_pos
 }
 
 draw :: proc() {
@@ -114,7 +187,9 @@ draw :: proc() {
 	rl.BeginDrawing()
 	clay_raylib_render(&ui_render_commands)
 	// rl.DrawFPS(10, 10)
-	// rl.DrawText(cstring(&g.pasted[0]), 10, rl.GetScreenHeight() - 30, 20, rl.BLACK)
+	for msg, i in g.debug_observe {
+		rl.DrawText(msg, 10, rl.GetScreenHeight() - 30 * i32(i + 1), 20, rl.WHITE)
+	}
 	rl.EndDrawing()
 }
 
@@ -173,6 +248,9 @@ game_init :: proc() {
 	g.recipe_allocator = mem.dynamic_arena_allocator(&g.recipe_arena)
 
 	g.recipe = new(Recipe, allocator = g.recipe_allocator)
+	g.camera = {
+		zoom = 1,
+	}
 
 	loadFont(FONT_ID_TITLE_16, 16, "assets/iosevka.ttf")
 	loadFont(FONT_ID_TITLE_24, 24, "assets/iosevka.ttf")
@@ -233,7 +311,7 @@ game_hot_reloaded :: proc(mem: rawptr) {
 
 	g.clay_graph_context = clay.Initialize(
 		g.clay_graph_arena,
-		{cast(f32)rl.GetScreenWidth(), cast(f32)rl.GetScreenHeight()},
+		{999999, 999999},
 		{handler = errorHandler},
 	)
 	clay.SetMeasureTextFunction(measure_text, nil)
@@ -253,4 +331,10 @@ game_force_restart :: proc() -> bool {
 // `rl.SetWindowSize` call if you don't want a resizable game.
 game_parent_window_size_changed :: proc(w, h: int) {
 	rl.SetWindowSize(i32(w), i32(h))
+}
+
+observe_debug :: proc(msg: cstring) {
+	if g.debug_show {
+		append(&g.debug_observe, msg)
+	}
 }

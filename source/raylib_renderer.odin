@@ -2,7 +2,7 @@ package game
 
 import clay "clay-odin"
 import "core:fmt"
-import "core:log"
+// import "core:log"
 import "core:math"
 import "core:strings"
 import hm "handle_map"
@@ -34,13 +34,16 @@ CustomRenderData :: struct {
 
 clay_raylib_render :: proc(
 	render_commands: ^clay.ClayArray(clay.RenderCommand),
+	offset: Vec2 = {0, 0},
 	allocator := context.temp_allocator,
 ) {
 	for i in 0 ..< render_commands.length {
 		render_command := clay.RenderCommandArray_Get(render_commands, i)
 		bounds := render_command.boundingBox
+		bounds.x += offset.x
+		bounds.y += offset.y
 
-		log.info(render_command.commandType, " at ", bounds)
+		// log.info(render_command.commandType, " at ", bounds)
 
 		switch render_command.commandType {
 		case .None: // None
@@ -78,14 +81,18 @@ clay_raylib_render :: proc(
 				clay_color_to_rl_color(tint),
 			)
 		case .ScissorStart:
-			rl.BeginScissorMode(
-				i32(math.round(bounds.x)),
-				i32(math.round(bounds.y)),
-				i32(math.round(bounds.width)),
-				i32(math.round(bounds.height)),
-			)
+			if offset == {0, 0} {
+				rl.BeginScissorMode(
+					i32(math.round(bounds.x)),
+					i32(math.round(bounds.y)),
+					i32(math.round(bounds.width)),
+					i32(math.round(bounds.height)),
+				)
+			}
 		case .ScissorEnd:
-			rl.EndScissorMode()
+			if offset == {0, 0} {
+				rl.EndScissorMode()
+			}
 		case .Rectangle:
 			config := render_command.renderData.rectangle
 			if config.cornerRadius.topLeft > 0 {
@@ -195,16 +202,23 @@ clay_raylib_render :: proc(
 			render_command_data := cast(^CustomRenderData)render_command.renderData.custom.customData
 			switch render_command_data.type {
 			case .graph_viewer:
-				clay.SetCurrentContext(g.clay_graph_context)
-				graph_render_commands: clay.ClayArray(clay.RenderCommand) = layout_graph_create(
-					render_command.boundingBox,
+				rl.BeginScissorMode(
+					i32(math.round(bounds.x)),
+					i32(math.round(bounds.y)),
+					i32(math.round(bounds.width)),
+					i32(math.round(bounds.height)),
 				)
-				log.info("Rendering graph")
-				clay_raylib_render(&graph_render_commands)
+				rl.BeginMode2D(g.camera)
+				clay.SetCurrentContext(g.clay_graph_context)
+				graph_render_commands: clay.ClayArray(clay.RenderCommand) = layout_graph_create()
+				g.graph_offset = Vec2{bounds.x, bounds.y}
+				// log.info("Rendering graph at:", bounds)
+				clay_raylib_render(&graph_render_commands, g.graph_offset)
+				rl.EndMode2D()
+				rl.EndScissorMode()
 				clay.SetCurrentContext(g.clay_ui_context)
 			case .edges:
-				canvas_start := Vec2{bounds.x, bounds.y} + g.graph_drawing_offset
-
+				canvas_start := Vec2{bounds.x, bounds.y}
 				if g.graph.draw_gutters {
 					for gutter in g.graph.gutters_vertical {
 						rl.DrawText(

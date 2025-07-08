@@ -121,11 +121,7 @@ layout_node_component :: proc(node: ^Node) {
 	{
 		id = id,
 		backgroundColor = background_color,
-		floating = {
-			clipTo = .AttachedParent,
-			attachTo = .Parent,
-			offset = g.graph_drawing_offset + node.position_px,
-		},
+		floating = {clipTo = .AttachedParent, attachTo = .Parent, offset = node.position_px},
 		layout = {
 			sizing = {
 				width = {type = .Fixed, constraints = {sizeMinMax = {min = node.size_px.x}}},
@@ -216,63 +212,54 @@ layout_ui_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
 			},
 			) {}
 		}
-		g.graph_editor_id = clay.ID("GraphEditorOuter")
-		graph_viewer_data := new(CustomRenderData, allocator = context.temp_allocator)
-		graph_viewer_data.type = .graph_viewer
-		graph_viewer_data.data = GraphViewerData{}
 		if clay.UI()(
 		{
-			id = g.graph_editor_id,
+			id = clay.ID("GraphBackground"),
 			layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})}},
 			backgroundColor = COLOR_EDITOR_BACKGROUND,
-			custom = {customData = graph_viewer_data},
 		},
-		) {}
+		) {
+			g.graph_editor_id = clay.ID("GraphEditorOuter")
+			graph_viewer_data := new(CustomRenderData, allocator = context.temp_allocator)
+			graph_viewer_data.type = .graph_viewer
+			graph_viewer_data.data = GraphViewerData{}
+			if clay.UI()(
+			{
+				id = g.graph_editor_id,
+				layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})}},
+				custom = {customData = graph_viewer_data},
+			},
+			) {}
+		}
 	}
 	return clay.EndLayout()
 }
 
-layout_graph_create :: proc(bounding_box: clay.BoundingBox) -> clay.ClayArray(clay.RenderCommand) {
+layout_graph_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
 	clay.BeginLayout()
+
 	if clay.UI()(
 	{
-		id = clay.ID("GraphEditorOuter"),
+		id = clay.ID("GraphEditor"),
 		layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})}},
-		floating = {clipTo = .AttachedParent, attachTo = .Parent},
+		clip = {horizontal = true, vertical = true},
 	},
 	) {
-		offset := Vec2{bounding_box.x, bounding_box.y}
-		g.graph_editor_id = clay.ID("GraphEditor")
+		edges_data := new(CustomRenderData, allocator = context.temp_allocator)
+		edges_data.type = .edges
+		edges_data.data = EdgesData{}
 		if clay.UI()(
 		{
-			id = g.graph_editor_id,
-			layout = {
-				sizing = {
-					width = clay.SizingFixed(bounding_box.width),
-					height = clay.SizingFixed(bounding_box.height),
-				},
-			},
-			floating = {clipTo = .AttachedParent, attachTo = .Parent, offset = offset},
-			clip = {horizontal = true, vertical = true},
-			backgroundColor = COLOR_EDITOR_BACKGROUND,
+			id = clay.ID("GraphEdges"),
+			layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})}},
+			custom = {customData = edges_data},
 		},
-		) {
-			edges_data := new(CustomRenderData, allocator = context.temp_allocator)
-			edges_data.type = .edges
-			edges_data.data = EdgesData{}
-			if clay.UI()(
-			{
-				id = clay.ID("GraphEdges"),
-				layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})}},
-				custom = {customData = edges_data},
-			},
-			) {}
+		) {}
 
-			if g.graph.draw_nodes {
-				node_iter := hm.make_iter(&g.graph.nodes)
-				for node in hm.iter(&node_iter) {
-					layout_node_component(node)
-				}
+		if g.graph.draw_nodes {
+			node_iter := hm.make_iter(&g.graph.nodes)
+			for node in hm.iter(&node_iter) {
+				layout_node_component(node)
 			}
 		}
 	}
