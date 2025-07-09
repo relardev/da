@@ -30,7 +30,9 @@ Node :: struct {
 	size_px:     Vec2,
 	depth:       i32,
 	clay_id:     clay.ElementId,
-	text:        string,
+	is_if_node:  bool,
+	// display stuff
+	name:        string,
 	type:        string,
 	arguments:   []string,
 }
@@ -48,6 +50,7 @@ Edge :: struct {
 	segments:        [5]Vec2, // points in pixels
 	arrow_direction: ArrowDirection,
 }
+
 
 Gutter :: struct {
 	edges:   [dynamic]EdgeHandle,
@@ -460,7 +463,7 @@ graph_print_gutter :: proc(graph: ^Graph) {
 			edge := hm.get(&graph.edges, edge_handle)
 			from_node := hm.get(&graph.nodes, edge.from)
 			to_node := hm.get(&graph.nodes, edge.to)
-			log.info(i, edge_handle, from_node.text, "->", to_node.text)
+			log.info(i, edge_handle, from_node.name, "->", to_node.name)
 		}
 	}
 
@@ -470,7 +473,7 @@ graph_print_gutter :: proc(graph: ^Graph) {
 			edge := hm.get(&graph.edges, edge_handle)
 			from_node := hm.get(&graph.nodes, edge.from)
 			to_node := hm.get(&graph.nodes, edge.to)
-			log.info(i, edge_handle, from_node.text, "->", to_node.text)
+			log.info(i, edge_handle, from_node.name, "->", to_node.name)
 		}
 	}
 

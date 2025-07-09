@@ -88,7 +88,7 @@ layout_node_core :: proc(node: ^Node) {
 		},
 		) {
 			clay.TextDynamic(
-				node.text,
+				node.name,
 				clay.TextConfig({textColor = BLACK, fontSize = 32, fontId = FONT_ID_TITLE_32}),
 			)
 		}
