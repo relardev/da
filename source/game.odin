@@ -31,7 +31,7 @@ Game_Memory :: struct {
 	graph_highlighted_nodes: []clay.ElementId,
 	graph_highlighted_edges: []EdgeHandle,
 	graph_editor_id:         clay.ElementId,
-	pasted:                  [8 * mem.Kilobyte]u8,
+	pasted:                  [50 * mem.Kilobyte]u8,
 	pasted_len:              i32,
 	recipe:                  ^Recipe,
 	recipe_arena:            mem.Dynamic_Arena,
@@ -207,7 +207,7 @@ game_update :: proc() {
 @(export)
 game_init_window :: proc() {
 	rl.SetConfigFlags({.VSYNC_HINT, .WINDOW_RESIZABLE, .MSAA_4X_HINT})
-	rl.InitWindow(1024, 768, "Odin")
+	rl.InitWindow(1024, 768, "Recipe Viewer")
 	rl.SetTargetFPS(rl.GetMonitorRefreshRate(0))
 	// rl.SetTargetFPS(10)
 	rl.SetExitKey(nil)

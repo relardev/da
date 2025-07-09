@@ -48,7 +48,7 @@
 						navigator.clipboard.readText().then(function(text) {
 								// Convert text to UTF-8 bytes
 								// let text = "This is a test";
-								if (text.length >= 8*1024) {
+								if (text.length >= 100*1024) {
 									console.error("Text too long for clipboard paste callback");
 									return; // Prevent buffer overflow
 								}
