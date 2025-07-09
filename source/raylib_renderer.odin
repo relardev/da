@@ -308,7 +308,7 @@ draw_edge :: proc(edge: ^Edge, canvas_start: Vec2, color: rl.Color) {
 	draw_arrow(edge.segments[last + 1] + canvas_start, edge.arrow_direction, color)
 }
 
-draw_arrow :: proc(pos: Vec2, direction: i32, color: rl.Color) {
+draw_arrow :: proc(pos: Vec2, direction: ArrowDirection, color: rl.Color) {
 	// Draw an arrow at the given position, pointing in the specified direction
 	// The arrow is drawn as a triangle with a base of 20 pixels and a height of 10 pixels
 	arrow_base: f32 = 20.0
@@ -316,13 +316,13 @@ draw_arrow :: proc(pos: Vec2, direction: i32, color: rl.Color) {
 
 	upper_right, upper_left: Vec2
 	switch direction {
-	case down:
+	case .Down:
 		upper_right = pos + {arrow_height, -arrow_base}
 		upper_left = pos + {-arrow_height, -arrow_base}
-	case left:
+	case .Left:
 		upper_right = pos + {arrow_base, arrow_height}
 		upper_left = pos + {arrow_base, -arrow_height}
-	case right:
+	case .Right:
 		upper_right = pos + {-arrow_base, -arrow_height}
 		upper_left = pos + {-arrow_base, arrow_height}
 	case:

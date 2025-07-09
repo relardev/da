@@ -35,16 +35,18 @@ Node :: struct {
 	arguments:   []string,
 }
 
-down: i32 = 1
-left: i32 = 2
-right: i32 = 3
+ArrowDirection :: enum {
+	Down,
+	Left,
+	Right,
+}
 
 Edge :: struct {
 	handle:          EdgeHandle,
 	from:            NodeHandle,
 	to:              NodeHandle,
 	segments:        [5]Vec2, // points in pixels
-	arrow_direction: i32,
+	arrow_direction: ArrowDirection,
 }
 
 Gutter :: struct {
@@ -219,7 +221,7 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 			   from_node.position.x == to_node.position.x {
 				// upper edge of to_node 
 				edge.segments[1] = to_node.position_px + (0.5 * {to_node.size_px.x, 0})
-				edge.arrow_direction = down
+				edge.arrow_direction = .Down
 				continue
 			}
 
@@ -261,10 +263,10 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 			// target edge
 			if edge.segments[3].x < to_node.position_px.x {
 				edge.segments[4] = {to_node.position_px.x, edge.segments[3].y}
-				edge.arrow_direction = right
+				edge.arrow_direction = .Right
 			} else {
 				edge.segments[4] = {to_node.position_px.x + to_node.size_px.x, edge.segments[3].y}
-				edge.arrow_direction = left
+				edge.arrow_direction = .Left
 			}
 		}
 	}
@@ -308,16 +310,16 @@ graph_unwind_crossings :: proc(graph: ^Graph, layer: []NodeHandle, descending: b
 
 			if a.center == -1 {
 				// make b go towards its center
-				direnction := b.pos - b.center
-				if direnction < 0 {
+				direction := b.pos - b.center
+				if direction < 0 {
 					return true // b should go left
 				} else {
 					return false // b should go right
 				}
 			}
 			if b.center == -1 {
-				direnction := a.pos - a.center
-				if direnction < 0 {
+				direction := a.pos - a.center
+				if direction < 0 {
 					return false // a should go right
 				} else {
 					return true // a should go left
