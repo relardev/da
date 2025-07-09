@@ -78,14 +78,30 @@ layout_node_core :: proc(node: ^Node) {
 		},
 	},
 	) {
-		clay.TextDynamic(
-			node.text,
-			clay.TextConfig({textColor = BLACK, fontSize = 24, fontId = FONT_ID_TITLE_24}),
-		)
+		if clay.UI()(
+		{
+			id = clay.ID("NodeTitle", node.handle.idx),
+			layout = {
+				sizing = {width = clay.SizingGrow({}), height = clay.SizingFit({})},
+				childAlignment = {x = .Center, y = .Center},
+			},
+		},
+		) {
+			clay.TextDynamic(
+				node.text,
+				clay.TextConfig({textColor = BLACK, fontSize = 32, fontId = FONT_ID_TITLE_32}),
+			)
+		}
 		clay.TextDynamic(
 			node.type,
 			clay.TextConfig({textColor = BLACK, fontSize = 24, fontId = FONT_ID_TITLE_24}),
 		)
+		for argument in node.arguments {
+			clay.TextDynamic(
+				argument,
+				clay.TextConfig({textColor = BLACK, fontSize = 16, fontId = FONT_ID_TITLE_16}),
+			)
+		}
 	}
 }
 

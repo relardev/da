@@ -1,6 +1,7 @@
 package game
 
 import "core:encoding/json"
+import "core:fmt"
 import "core:mem"
 import hm "handle_map"
 
@@ -28,10 +29,34 @@ recipe_create_from_clipboard :: proc() {
 
 
 	for name, node_def in g.recipe.Nodes {
-		hm.add(&g.graph.nodes, Node{text = name, type = node_def.Type})
+		arguments := make([]string, len(node_def.Args), allocator = g.recipe_allocator)
+		i := 0
+		for key, value in node_def.Args {
+			arguments[i] = fmt.aprintf("%v: %v", key, value, allocator = g.recipe_allocator)
+			i += 1
+		}
+		hm.add(&g.graph.nodes, Node{text = name, type = node_def.Type, arguments = arguments})
 	}
 
-	hm.add(&g.graph.nodes, Node{text = "_start"})
+	match_conditions := g.recipe.Trigger.Args["match_conditions"]
+	start_args := make([]string, len(match_conditions), allocator = g.recipe_allocator)
+	for match_condition, i in match_conditions {
+		str: string
+		if match_condition.Operator != "" {
+			str = fmt.aprintf(
+				"%v %v %v",
+				match_condition.Key,
+				match_condition.Operator,
+				match_condition.Value,
+				allocator = g.recipe_allocator,
+			)
+		} else {
+			str = fmt.aprintf("%v exists", match_condition.Key, allocator = g.recipe_allocator)
+		}
+		start_args[i] = str
+	}
+	hm.add(&g.graph.nodes, Node{text = "_start", arguments = start_args})
+
 	for from, tos in g.recipe.Edges {
 		for to in tos {
 			from_handle: NodeHandle

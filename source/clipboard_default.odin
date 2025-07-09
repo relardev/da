@@ -9,6 +9,9 @@ recipe_arena_align :: 8 * align_of(rawptr)
 
 clipboard_paste :: proc() {
 	txt := rl.GetClipboardText()
+	if len(txt) == 0 {
+		return
+	}
 	assert(len(txt) + 1 < len(g.pasted), "clipboard text too long")
 	mem.copy(&g.pasted[0], rawptr(txt), len(txt) + 1)
 	g.pasted_len = i32(len(txt)) + 1

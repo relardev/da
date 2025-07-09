@@ -32,6 +32,7 @@ Node :: struct {
 	clay_id:     clay.ElementId,
 	text:        string,
 	type:        string,
+	arguments:   []string,
 }
 
 down: i32 = 1

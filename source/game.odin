@@ -20,6 +20,7 @@ Game_Memory :: struct {
 	clay_ui_memory:          rawptr,
 	clay_ui_arena:           clay.Arena,
 	clay_ui_context:         ^clay.Context,
+	clay_graph_debug_mode:   bool,
 	clay_graph_memory:       rawptr,
 	clay_graph_arena:        clay.Arena,
 	clay_graph_context:      ^clay.Context,
@@ -49,10 +50,6 @@ update :: proc() {
 	// Update that happen no matter where the mouse is
 	{
 		g.debug_observe = make([dynamic]cstring, 0, 100, allocator = context.temp_allocator)
-		if rl.IsKeyPressed(.D) {
-			g.clay_ui_debug_mode = !g.clay_ui_debug_mode
-			clay.SetDebugModeEnabled(g.clay_ui_debug_mode)
-		}
 
 		if rl.IsKeyPressed(.ESCAPE) {
 			g.run = false
@@ -98,8 +95,13 @@ update :: proc() {
 	observe_debug(fmt.ctprintf("pointer over editor: %v", is_pointer_over_editor))
 	if is_pointer_over_editor {
 		// MOUSE IN GRAPH
-		observe_debug(fmt.ctprintf("graph offset: %v", g.graph_offset))
 		clay.SetCurrentContext(g.clay_graph_context)
+		clay.SetLayoutDimensions({g.graph.size_px.x + 200, 9999999})
+		if rl.IsKeyPressed(.D) {
+			g.clay_graph_debug_mode = !g.clay_graph_debug_mode
+			clay.SetDebugModeEnabled(g.clay_graph_debug_mode)
+		}
+		observe_debug(fmt.ctprintf("graph offset: %v", g.graph_offset))
 		mouse_in_graph_editor := rl.GetScreenToWorld2D(
 			mouse_pos - (g.graph_offset * g.camera.zoom),
 			g.camera,
@@ -149,34 +151,42 @@ update :: proc() {
 			g.camera.target += delta / g.camera.zoom
 		}
 
-		// Zoom
+		wheel := rl.GetMouseWheelMove()
+		// Mouse Wheel stuff
 		{
-			wheel := rl.GetMouseWheelMove()
 			if wheel != 0 {
-				g.camera.zoom += wheel * ZOOM_SPEED
-				g.camera.zoom = clamp(g.camera.zoom, MIN_ZOOM, MAX_ZOOM)
+				if rl.IsKeyDown(.LEFT_SHIFT) {
+					clay.UpdateScrollContainers(false, rl.GetMouseWheelMoveV(), rl.GetFrameTime())
+				} else {
+					g.camera.zoom += wheel * ZOOM_SPEED
+					g.camera.zoom = clamp(g.camera.zoom, MIN_ZOOM, MAX_ZOOM)
 
-				new_mouse_world_pos := rl.GetScreenToWorld2D(
-					mouse_pos - (g.graph_offset * g.camera.zoom),
-					g.camera,
-				)
-				g.camera.target += mouse_in_graph_editor - new_mouse_world_pos
-				observe_debug(
-					fmt.ctprintf(
-						"Zoom: %.2f, Mouse World Pos: [%.2f, %.2f], %.2f, %.2f",
-						g.camera.zoom,
-						new_mouse_world_pos.x,
-						new_mouse_world_pos.y,
-						mouse_in_graph_editor.x,
-						mouse_in_graph_editor.y,
-					),
-				)
+					new_mouse_world_pos := rl.GetScreenToWorld2D(
+						mouse_pos - (g.graph_offset * g.camera.zoom),
+						g.camera,
+					)
+					g.camera.target += mouse_in_graph_editor - new_mouse_world_pos
+					observe_debug(
+						fmt.ctprintf(
+							"Zoom: %.2f, Mouse World Pos: [%.2f, %.2f], %.2f, %.2f",
+							g.camera.zoom,
+							new_mouse_world_pos.x,
+							new_mouse_world_pos.y,
+							mouse_in_graph_editor.x,
+							mouse_in_graph_editor.y,
+						),
+					)
+				}
 			}
 
 		}
 	} else {
 		// MOUSE IN UI
 		clay.UpdateScrollContainers(false, rl.GetMouseWheelMoveV(), rl.GetFrameTime())
+		if rl.IsKeyPressed(.D) {
+			g.clay_ui_debug_mode = !g.clay_ui_debug_mode
+			clay.SetDebugModeEnabled(g.clay_ui_debug_mode)
+		}
 	}
 	g.prev_mouse_pos = mouse_pos
 }
