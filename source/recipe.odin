@@ -20,14 +20,6 @@ recipe_create_from_clipboard :: proc() {
 		return
 	}
 
-	// n0 := hm.add(&g.graph.nodes, Node{text = "Node 0", size_px = {200, 200}})
-	// n1 := hm.add(&g.graph.nodes, Node{text = "Node 1"})
-	// n2 := hm.add(&g.graph.nodes, Node{text = "Node top2"})
-	//
-	// hm.add(&g.graph.edges, Edge{from = n0, to = n1})
-	// hm.add(&g.graph.edges, Edge{from = n2, to = n1})
-
-
 	for name, node_def in g.recipe.Nodes {
 		arguments := make([]string, len(node_def.Args), allocator = g.recipe_allocator)
 		i := 0
