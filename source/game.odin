@@ -87,8 +87,7 @@ update :: proc() {
 		}
 
 		if rl.IsKeyPressed(.N) {
-			g.hide_noops = !g.hide_noops
-			recipe_create_from_pasted()
+			toggle_noops()
 		}
 	}
 
@@ -356,4 +355,9 @@ observe_debug :: proc(msg: cstring) {
 	if g.debug_show {
 		append(&g.debug_observe, msg)
 	}
+}
+
+toggle_noops :: proc() {
+	g.hide_noops = !g.hide_noops
+	recipe_create_from_pasted()
 }

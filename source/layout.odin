@@ -1,7 +1,7 @@
 package game
 
+import "base:runtime"
 import clay "clay-odin"
-// import "core:log"
 import hm "handle_map"
 
 
@@ -285,22 +285,80 @@ layout_ui_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
 		}
 		if clay.UI()(
 		{
-			id = clay.ID("GraphBackground"),
-			layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})}},
-			backgroundColor = COLOR_EDITOR_BACKGROUND,
+			id = clay.ID("MainWorkspace"),
+			layout = {
+				sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})},
+				layoutDirection = .LeftToRight,
+				childGap = 16,
+			},
 		},
 		) {
-			g.graph_editor_id = clay.ID("GraphEditorOuter")
-			graph_viewer_data := new(CustomRenderData, allocator = context.temp_allocator)
-			graph_viewer_data.type = .graph_viewer
-			graph_viewer_data.data = GraphViewerData{}
 			if clay.UI()(
 			{
-				id = g.graph_editor_id,
-				layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})}},
-				custom = {customData = graph_viewer_data},
+				id = clay.ID("LeftPanel"),
+				layout = {
+					sizing = {width = clay.SizingFit({}), height = clay.SizingGrow({})},
+					padding = {8, 8, 8, 8},
+				},
+				backgroundColor = COLOR_BACKGROUND,
 			},
-			) {}
+			) {
+				border := clay.BorderElementConfig {
+					width = {left = 2, right = 2, top = 2, bottom = 2},
+					color = COLOR_NODE_BORDER,
+				}
+
+				if g.hide_noops {
+					border = {}
+				}
+
+				if clay.UI()(
+				{
+					id = clay.ID("ToggleNoopNodesButton"),
+					layout = {
+						sizing = {width = clay.SizingGrow({}), height = clay.SizingFit({})},
+						padding = {8, 8, 0, 0},
+						childAlignment = {y = .Center},
+					},
+					border = border,
+					backgroundColor = clay.Hovered() ? COLOR_NODE_BACKGROUND_H : COLOR_NODE_BACKGROUND,
+				},
+				) {
+					clay.OnHover(proc "c" (id: clay.ElementId, pd: clay.PointerData, _: rawptr) {
+							context = runtime.default_context()
+							if pd.state == .PressedThisFrame {
+								toggle_noops()
+							}
+						}, nil)
+					clay.Text(
+						"Noops",
+						clay.TextConfig(
+							{textColor = BLACK, fontSize = 32, fontId = FONT_ID_TITLE_32},
+						),
+					)
+				}
+			}
+			if clay.UI()(
+			{
+				id = clay.ID("GraphBackground"),
+				layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})}},
+				backgroundColor = COLOR_EDITOR_BACKGROUND,
+			},
+			) {
+				g.graph_editor_id = clay.ID("GraphEditorOuter")
+				graph_viewer_data := new(CustomRenderData, allocator = context.temp_allocator)
+				graph_viewer_data.type = .graph_viewer
+				graph_viewer_data.data = GraphViewerData{}
+				if clay.UI()(
+				{
+					id = g.graph_editor_id,
+					layout = {
+						sizing = {width = clay.SizingGrow({}), height = clay.SizingGrow({})},
+					},
+					custom = {customData = graph_viewer_data},
+				},
+				) {}
+			}
 		}
 	}
 	return clay.EndLayout()
