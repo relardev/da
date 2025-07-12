@@ -40,6 +40,7 @@ Game_Memory :: struct {
 	recipe_allocator:        mem.Allocator,
 	camera:                  rl.Camera2D,
 	graph_offset:            Vec2,
+	hide_noops:              bool,
 	debug_show:              bool,
 	debug_observe:           [dynamic]cstring,
 	debug_draw_camera:       bool,
@@ -83,6 +84,10 @@ update :: proc() {
 
 		if rl.IsKeyPressed(.V) && rl.IsKeyDown(.LEFT_CONTROL) {
 			clipboard_paste()
+		}
+		if rl.IsKeyPressed(.N) {
+			g.hide_noops = !g.hide_noops
+
 		}
 	}
 

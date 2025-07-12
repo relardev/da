@@ -4,11 +4,15 @@ import clay "clay-odin"
 import ts "core:container/topological_sort"
 import "core:fmt"
 import "core:log"
+import "core:math/rand"
 import "core:slice"
 import hm "handle_map"
 
+
 gutter_edge_distance: f32 = 10.0 // distance between edges in gutters
 gutter_padding: f32 = 40.0 // padding around gutters
+
+RANDOM_SEED: u64 = 0x123456789abcdef0
 
 Graph :: struct {
 	nodes:              hm.Handle_Map(Node, NodeHandle, 1024),
@@ -69,6 +73,9 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 	sorter: ts.Sorter(NodeHandle)
 	// main_allocator := context.allocator
 	context.allocator = context.temp_allocator
+	state := rand.create(RANDOM_SEED)
+	context.random_generator = rand.default_random_generator(&state)
+
 	ts.init(&sorter)
 	defer ts.destroy(&sorter)
 
