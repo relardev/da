@@ -210,6 +210,7 @@ clay_raylib_render :: proc(
 				)
 				rl.BeginMode2D(g.camera)
 				clay.SetCurrentContext(g.clay_graph_context)
+				layout_graph_create()
 				graph_render_commands: clay.ClayArray(clay.RenderCommand) = layout_graph_create()
 				g.graph_offset = Vec2{bounds.x, bounds.y}
 				// log.info("Rendering graph at:", bounds)

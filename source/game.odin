@@ -3,6 +3,7 @@ package game
 import "base:runtime"
 import clay "clay-odin"
 import "core:fmt"
+// import "core:log"
 import "core:mem"
 import hm "handle_map"
 import rl "vendor:raylib"

@@ -27,16 +27,42 @@ recipe_create_from_clipboard :: proc() {
 		return
 	}
 
-	future_edges := make([dynamic]FutureEdge, 0, 8, allocator = g.recipe_allocator)
+	last_attribute_id: i32 = 0
 
+	// Start node (triggers)
+	match_conditions := g.recipe.Trigger.Args["match_conditions"]
+	start_args := make([]Argument, len(match_conditions), allocator = g.recipe_allocator)
+	for match_condition, i in match_conditions {
+		str: string
+		if match_condition.Operator != "" {
+			str = fmt.aprintf(
+				"%v %v %v",
+				match_condition.Key,
+				match_condition.Operator,
+				match_condition.Value,
+				allocator = g.recipe_allocator,
+			)
+		} else {
+			str = fmt.aprintf("%v exists", match_condition.Key, allocator = g.recipe_allocator)
+		}
+		start_args[i] = argument_create(str, &last_attribute_id)
+	}
+	hm.add(&g.graph.nodes, Node{name = "_start", arguments = start_args})
+
+	// Create nodes
+	future_edges := make([dynamic]FutureEdge, 0, 8, allocator = g.recipe_allocator)
 	for name, node_def in g.recipe.Nodes {
-		arguments := make([]string, len(node_def.Args), allocator = g.recipe_allocator)
+		arguments := make([]Argument, len(node_def.Args), allocator = g.recipe_allocator)
 		i := 0
 		for key, value in node_def.Args {
-			arguments[i] = fmt.aprintf("%v: %v", key, value, allocator = g.recipe_allocator)
+			arguments[i] = argument_create(
+				fmt.aprintf("%v: %v", key, value, allocator = g.recipe_allocator),
+				&last_attribute_id,
+			)
 			i += 1
 		}
-		if node_def.Type == "C_IF" {
+		switch node_def.Type {
+		case "C_IF":
 			if_handle := hm.add(
 				&g.graph.nodes,
 				Node{name = name, type = node_def.Type, arguments = arguments, is_if_node = true},
@@ -53,7 +79,19 @@ recipe_create_from_clipboard :: proc() {
 				false_node_name := false_node_name.(json.String)
 				append(&future_edges, FutureEdge{from = if_handle, to = false_node_name})
 			}
-		} else {
+		case "C_DELAY":
+			delay := hm.add(
+				&g.graph.nodes,
+				Node{name = name, type = node_def.Type, arguments = arguments},
+			)
+
+			next_nodes := node_def.Args["next_node_ids"].(json.Array)
+			for next_node in next_nodes {
+				true_node_name := next_node.(json.String)
+				append(&future_edges, FutureEdge{from = delay, to = true_node_name})
+			}
+
+		case:
 			hm.add(&g.graph.nodes, Node{name = name, type = node_def.Type, arguments = arguments})
 		}
 	}
@@ -68,25 +106,7 @@ recipe_create_from_clipboard :: proc() {
 		}
 	}
 
-	match_conditions := g.recipe.Trigger.Args["match_conditions"]
-	start_args := make([]string, len(match_conditions), allocator = g.recipe_allocator)
-	for match_condition, i in match_conditions {
-		str: string
-		if match_condition.Operator != "" {
-			str = fmt.aprintf(
-				"%v %v %v",
-				match_condition.Key,
-				match_condition.Operator,
-				match_condition.Value,
-				allocator = g.recipe_allocator,
-			)
-		} else {
-			str = fmt.aprintf("%v exists", match_condition.Key, allocator = g.recipe_allocator)
-		}
-		start_args[i] = str
-	}
-	hm.add(&g.graph.nodes, Node{name = "_start", arguments = start_args})
-
+	// Edges
 	for from, tos in g.recipe.Edges {
 		for to in tos {
 			from_handle: NodeHandle

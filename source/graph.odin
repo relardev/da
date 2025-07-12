@@ -2,6 +2,7 @@ package game
 
 import clay "clay-odin"
 import ts "core:container/topological_sort"
+import "core:fmt"
 import "core:log"
 import "core:slice"
 import hm "handle_map"
@@ -34,7 +35,13 @@ Node :: struct {
 	// display stuff
 	name:        string,
 	type:        string,
-	arguments:   []string,
+	arguments:   []Argument,
+}
+
+Argument :: struct {
+	text:      string,
+	long_text: string,
+	clay_id:   clay.ElementId,
 }
 
 ArrowDirection :: enum {
@@ -477,4 +484,22 @@ graph_print_gutter :: proc(graph: ^Graph) {
 		}
 	}
 
+}
+
+argument_create :: proc(original_text: string, id: ^i32) -> Argument {
+	long_text: string
+	text := original_text
+	if len(text) > 90 {
+		long_text = text
+		text = fmt.aprintf("%s...", text[:90], allocator = g.recipe_allocator)
+	}
+
+	our_id := id^
+	id^ = our_id + 1
+
+	return Argument {
+		text = text,
+		long_text = long_text,
+		clay_id = clay.ID("NodeAttribute", u32(our_id)),
+	}
 }

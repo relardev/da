@@ -1,6 +1,7 @@
 package game
 
 import clay "clay-odin"
+// import "core:log"
 import hm "handle_map"
 
 
@@ -46,6 +47,9 @@ COLOR_EDITOR_BACKGROUND := CHARCOAL
 COLOR_EDGE := BURNT_SIENNA
 COLOR_EDGE_H := WHITE
 COLOR_EDGE_L := BURNT_SIENNA_L
+
+TOOLTIP_BACKGROUND := SAFFRON
+TOOLTIP_BORDER := SAFFRON_H
 
 button_component :: proc(id: clay.ElementId, $text: string) {
 	if clay.UI()(
@@ -97,10 +101,63 @@ layout_node_core :: proc(node: ^Node) {
 			clay.TextConfig({textColor = BLACK, fontSize = 24, fontId = FONT_ID_TITLE_24}),
 		)
 		for argument in node.arguments {
-			clay.TextDynamic(
-				argument,
-				clay.TextConfig({textColor = BLACK, fontSize = 16, fontId = FONT_ID_TITLE_16}),
-			)
+
+			if clay.UI()(
+			{
+				id = argument.clay_id,
+				layout = {sizing = {width = clay.SizingFit({}), height = clay.SizingFit({})}},
+			},
+			) {
+				if len(argument.long_text) > 0 {
+					point_over := clay.PointerOver(argument.clay_id)
+					if point_over {
+						data := clay.GetElementData(argument.clay_id)
+						tooltip_id := clay.ID("tooltip")
+						tooltip_data := clay.GetElementData(tooltip_id)
+						if clay.UI()(
+						{
+							id = tooltip_id,
+							layout = {
+								padding = {8, 8, 8, 8},
+								sizing = {
+									width = clay.SizingFit({max = 300}),
+									height = clay.SizingFit({}),
+								},
+							},
+							floating = {
+								offset = {
+									data.boundingBox.width + 20,
+									-tooltip_data.boundingBox.height / 2,
+								},
+								attachTo = .Parent,
+								zIndex = 1,
+							},
+							backgroundColor = TOOLTIP_BACKGROUND,
+							border = {
+								width = {left = 2, right = 2, top = 2, bottom = 2},
+								color = TOOLTIP_BORDER,
+							},
+						},
+						) {
+							clay.TextDynamic(
+								argument.long_text,
+								clay.TextConfig(
+									{
+										textColor = BLACK,
+										fontSize = 16,
+										fontId = FONT_ID_TITLE_16,
+										wrapMode = .Words,
+									},
+								),
+							)
+						}
+					}
+				}
+				clay.TextDynamic(
+					argument.text,
+					clay.TextConfig({textColor = BLACK, fontSize = 16, fontId = FONT_ID_TITLE_16}),
+				)
+			}
 		}
 	}
 }
@@ -154,8 +211,6 @@ layout_node_component :: proc(node: ^Node) {
 layout_ui_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
 	clay.SetCurrentContext(g.clay_ui_context)
 	clay.BeginLayout()
-	// An example of laying out a UI with a fixed-width sidebar and flexible-width main content
-	// NOTE: To create a scope for child components, the Odin API uses `if` with components that have children
 	if clay.UI()(
 	{
 		id = clay.ID("OuterContainer"),
