@@ -44,6 +44,8 @@ Game_Memory :: struct {
 	debug_show:              bool,
 	debug_observe:           [dynamic]cstring,
 	debug_draw_camera:       bool,
+	search_query:            string,
+	search_element_last_id:  u32,
 }
 
 g: ^Game_Memory
@@ -89,6 +91,9 @@ update :: proc() {
 		if rl.IsKeyPressed(.N) {
 			toggle_noops()
 		}
+
+		// Search
+		g.search_element_last_id = 0
 	}
 
 	mouse_pos := rl.GetMousePosition()
@@ -276,6 +281,7 @@ game_init :: proc() {
 	loadFont(FONT_ID_TITLE_56, 56, "assets/iosevka.ttf")
 
 	game_hot_reloaded(g)
+	g.search_query = "IAB"
 }
 
 @(export)

@@ -2,6 +2,7 @@ package game
 
 import "base:runtime"
 import clay "clay-odin"
+import "core:strings"
 import hm "handle_map"
 
 
@@ -51,22 +52,40 @@ COLOR_EDGE_L := BURNT_SIENNA_L
 TOOLTIP_BACKGROUND := SAFFRON
 TOOLTIP_BORDER := SAFFRON_H
 
-button_component :: proc(id: clay.ElementId, $text: string) {
-	if clay.UI()(
-	{
-		id = id,
-		layout = {
-			padding = {8, 8, 0, 0},
-			sizing = {width = clay.SizingFit({}), height = clay.SizingGrow({})},
-			childAlignment = {y = .Center},
-		},
-		backgroundColor = COLOR_BACKGROUND,
-	},
-	) {
-		clay.Text(
-			text,
-			clay.TextConfig({textColor = BLACK, fontSize = 16, fontId = FONT_ID_TITLE_16}),
-		)
+COLOR_HIGHLIGHT_SEARCH := WHITE
+
+layout_text :: proc(text: string, config: ^clay.TextElementConfig) {
+	if strings.contains(text, g.search_query) {
+		if clay.UI()({id = clay.ID("TextHighlightContainer", g.search_element_last_id)}) {
+			text := text
+			i := 0
+			for {
+				part := text[i:]
+				idx := strings.index(part, g.search_query)
+				if idx < 0 {
+					if len(text) > 0 {
+						clay.TextDynamic(part, config)
+					}
+					break
+				}
+
+				clay.TextDynamic(part[:idx], config)
+				if clay.UI()(
+				{
+					id = clay.ID("TextHighlight", g.search_element_last_id),
+					layout = {sizing = {width = clay.SizingFit({}), height = clay.SizingFit({})}},
+					backgroundColor = COLOR_HIGHLIGHT_SEARCH,
+				},
+				) {
+					g.search_element_last_id += 1
+					clay.TextDynamic(g.search_query, config)
+				}
+
+				i += idx + len(g.search_query)
+			}
+		}
+	} else {
+		clay.TextDynamic(text, config)
 	}
 }
 
@@ -91,12 +110,12 @@ layout_node_core :: proc(node: ^Node) {
 			},
 		},
 		) {
-			clay.TextDynamic(
+			layout_text(
 				node.name,
 				clay.TextConfig({textColor = BLACK, fontSize = 32, fontId = FONT_ID_TITLE_32}),
 			)
 		}
-		clay.TextDynamic(
+		layout_text(
 			node.type,
 			clay.TextConfig({textColor = BLACK, fontSize = 24, fontId = FONT_ID_TITLE_24}),
 		)
@@ -153,7 +172,7 @@ layout_node_core :: proc(node: ^Node) {
 						}
 					}
 				}
-				clay.TextDynamic(
+				layout_text(
 					argument.text,
 					clay.TextConfig({textColor = BLACK, fontSize = 16, fontId = FONT_ID_TITLE_16}),
 				)
@@ -247,7 +266,7 @@ layout_ui_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
 					backgroundColor = BURNT_SIENNA,
 				},
 				) {
-					clay.TextDynamic(
+					layout_text(
 						g.recipe.Type,
 						clay.TextConfig(
 							{textColor = BLACK, fontSize = 32, fontId = FONT_ID_TITLE_32},
@@ -267,7 +286,7 @@ layout_ui_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
 					backgroundColor = BURNT_SIENNA,
 				},
 				) {
-					clay.TextDynamic(
+					layout_text(
 						g.recipe.Name,
 						clay.TextConfig(
 							{textColor = BLACK, fontSize = 32, fontId = FONT_ID_TITLE_32},
