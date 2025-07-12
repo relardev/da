@@ -4,7 +4,6 @@ import clay "clay-odin"
 import ts "core:container/topological_sort"
 import "core:fmt"
 import "core:log"
-import "core:math/rand"
 import "core:slice"
 import hm "handle_map"
 
@@ -71,22 +70,21 @@ Gutter :: struct {
 
 graph_calculate_layout :: proc(graph: ^Graph) {
 	sorter: ts.Sorter(NodeHandle)
-	// main_allocator := context.allocator
 	context.allocator = context.temp_allocator
-	state := rand.create(RANDOM_SEED)
-	context.random_generator = rand.default_random_generator(&state)
 
 	ts.init(&sorter)
 	defer ts.destroy(&sorter)
 
 	node_iter := hm.make_iter(&graph.nodes)
 	for node in hm.iter(&node_iter) {
+		// log.info("Adding node to sorter: ", node.handle, " - ", node.name)
 		ok := ts.add_key(&sorter, node.handle)
 		assert(ok, "Failed to add node to sorter")
 	}
 
 	edge_iter := hm.make_iter(&graph.edges)
 	for edge in hm.iter(&edge_iter) {
+		// log.info("Adding edge dependency to sorter: ", edge.from, " -> ", edge.to)
 		ok := ts.add_dependency(&sorter, edge.to, edge.from)
 		assert(ok, "Failed to add edge dependency to sorter")
 	}

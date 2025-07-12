@@ -85,9 +85,10 @@ update :: proc() {
 		if rl.IsKeyPressed(.V) && rl.IsKeyDown(.LEFT_CONTROL) {
 			clipboard_paste()
 		}
+
 		if rl.IsKeyPressed(.N) {
 			g.hide_noops = !g.hide_noops
-
+			recipe_create_from_pasted()
 		}
 	}
 

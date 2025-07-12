@@ -2,11 +2,13 @@ package game
 
 import "core:encoding/json"
 import "core:fmt"
+// import "core:log"
+import "core:math/rand"
 import "core:mem"
 import hm "handle_map"
 
 clipboard_after_paste :: proc() {
-	recipe_create_from_clipboard()
+	recipe_create_from_pasted()
 }
 
 // Edge that to node might not exist yet, so we look it up after all nodes are created
@@ -16,7 +18,9 @@ FutureEdge :: struct {
 	to:   string,
 }
 
-recipe_create_from_clipboard :: proc() {
+recipe_create_from_pasted :: proc() {
+	state := rand.create(RANDOM_SEED)
+	context.random_generator = rand.default_random_generator(&state)
 	hm.clear(&g.graph.nodes)
 	hm.clear(&g.graph.edges)
 
@@ -124,6 +128,38 @@ recipe_create_from_clipboard :: proc() {
 				panic("Failed to find node for edge")
 			}
 			hm.add(&g.graph.edges, Edge{from = from_handle, to = to_handle})
+		}
+	}
+
+	if g.hide_noops {
+		node_iter := hm.make_iter(&g.graph.nodes)
+		for node in hm.iter(&node_iter) {
+			if node.type == "T_NOOP" {
+				// log.info("Removing noop node: %v", node.handle)
+				outgoing_edges := make([dynamic]NodeHandle, 0, 8, allocator = g.recipe_allocator)
+				edge_iter := hm.make_iter(&g.graph.edges)
+				for edge in hm.iter(&edge_iter) {
+					if edge.from == node.handle {
+						append(&outgoing_edges, edge.to)
+						// log.info("\tremoving outgoing edge: %v -> %v", edge.from, edge.to)
+						hm.remove(&g.graph.edges, edge.handle)
+					}
+				}
+
+				edge_iter = hm.make_iter(&g.graph.edges)
+				for edge in hm.iter(&edge_iter) {
+					if edge.to == node.handle {
+						hm.remove(&g.graph.edges, edge.handle)
+						// log.info("\tremoving incoming edge: %v -> %v", edge.from, edge.to)
+						for outgoing_edge in outgoing_edges {
+							// Add edges from the node to all outgoing edges
+							// log.info("\tadding edge: %v -> %v", edge.from, outgoing_edge)
+							hm.add(&g.graph.edges, Edge{from = edge.from, to = outgoing_edge})
+						}
+					}
+				}
+				hm.remove(&g.graph.nodes, node.handle)
+			}
 		}
 	}
 
