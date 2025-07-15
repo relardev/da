@@ -30,6 +30,7 @@
 	<canvas class="game_canvas" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1" onmousedown="event.target.focus()" onkeydown="event.preventDefault()"></canvas>
 	<script type="text/javascript" src="odin.js"></script>
 	<script>
+		var key_input_stack = [];
 		var odinMemoryInterface = new odin.WasmMemoryInterface();
 		odinMemoryInterface.setIntSize(4);
 		var odinImports = odin.setupDefaultImports(odinMemoryInterface);
@@ -43,6 +44,9 @@
 					...imports
 				}
 
+				newImports.env.js_get_key = function(ptr) {
+					return key_input_stack.length > 0 ? key_input_stack.shift() : 0;
+				}
 				newImports.env.js_paste_from_clipboard = function(ptr) {
 						// Ensure a user gesture triggers this function!
 						navigator.clipboard.readText().then(function(text) {
@@ -93,6 +97,17 @@
 				window.addEventListener('resize', function(event) {
 					send_resize();
 				}, true);
+
+				// js_get_key
+				window.addEventListener('keydown', e => {
+					if (e.ctrlKey || e.altKey || e.metaKey) {
+						return;
+    }
+					if (e.key.length === 1) for (const cp of e.key) key_input_stack.push(cp.codePointAt(0));
+				});
+				window.addEventListener('input', e => {
+					if (e.data) for (const cp of e.data) key_input_stack.push(cp.codePointAt(0));
+				});
 
 				// This can probably be done better: Ideally we'd feed the
 				// initial size to `main_start`. But there seems to be a

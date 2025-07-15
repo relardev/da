@@ -5,6 +5,8 @@ import clay "clay-odin"
 import "core:fmt"
 // import "core:log"
 import "core:mem"
+import "core:strings"
+import textedit "core:text/edit"
 import hm "handle_map"
 import rl "vendor:raylib"
 
@@ -12,53 +14,135 @@ ZOOM_SPEED: f32 = 0.1
 MIN_ZOOM: f32 = 0.1
 MAX_ZOOM: f32 = 10
 
+SEARCH_BUFFER_SIZE :: 256
+
 Vec2 :: [2]f32
 Vec2i :: [2]i32
 
 Game_Memory :: struct {
-	run:                     bool,
-	clay_ui_debug_mode:      bool,
-	clay_ui_memory:          rawptr,
-	clay_ui_arena:           clay.Arena,
-	clay_ui_context:         ^clay.Context,
-	clay_graph_debug_mode:   bool,
-	clay_graph_memory:       rawptr,
-	clay_graph_arena:        clay.Arena,
-	clay_graph_context:      ^clay.Context,
-	clay_node_memory:        rawptr,
-	raylib_fonts:            [dynamic]Raylib_Font,
-	prev_mouse_pos:          Vec2,
-	graph:                   Graph,
-	graph_selected_node:     clay.ElementId,
-	graph_highlighted_nodes: []clay.ElementId,
-	graph_highlighted_edges: []EdgeHandle,
-	graph_editor_id:         clay.ElementId,
-	pasted:                  [50 * mem.Kilobyte]u8,
-	pasted_len:              i32,
-	recipe:                  ^Recipe,
-	recipe_arena:            mem.Dynamic_Arena,
-	recipe_allocator:        mem.Allocator,
-	camera:                  rl.Camera2D,
-	graph_offset:            Vec2,
-	hide_noops:              bool,
-	debug_show:              bool,
-	debug_observe:           [dynamic]cstring,
-	debug_draw_camera:       bool,
-	search_query:            string,
-	search_element_last_id:  u32,
+	run:                                 bool,
+	clay_ui_debug_mode:                  bool,
+	clay_ui_memory:                      rawptr,
+	clay_ui_arena:                       clay.Arena,
+	clay_ui_context:                     ^clay.Context,
+	clay_graph_debug_mode:               bool,
+	clay_graph_memory:                   rawptr,
+	clay_graph_arena:                    clay.Arena,
+	clay_graph_context:                  ^clay.Context,
+	clay_node_memory:                    rawptr,
+	raylib_fonts:                        [dynamic]Raylib_Font,
+	prev_mouse_pos:                      Vec2,
+	graph:                               Graph,
+	graph_selected_node:                 clay.ElementId,
+	graph_highlighted_nodes:             []clay.ElementId,
+	graph_highlighted_edges:             []EdgeHandle,
+	graph_editor_id:                     clay.ElementId,
+	pasted:                              [50 * mem.Kilobyte]u8,
+	pasted_len:                          i32,
+	recipe:                              ^Recipe,
+	recipe_arena:                        mem.Dynamic_Arena,
+	recipe_allocator:                    mem.Allocator,
+	camera:                              rl.Camera2D,
+	graph_offset:                        Vec2,
+	hide_noops:                          bool,
+	debug_show:                          bool,
+	debug_observe:                       [dynamic]cstring,
+	debug_draw_camera:                   bool,
+	search_query:                        string,
+	search_text_hilhglight_container_id: u32,
+	search_element_last_id:              u32,
+	search_buffer:                       [SEARCH_BUFFER_SIZE]u8,
+	search_textbox_state:                textedit.State,
+	input_text_buf:                      [1024]u8,
+	input_text:                          strings.Builder,
+	focus:                               Element,
+}
+
+Element :: enum {
+	Nothing,
+	Search,
 }
 
 g: ^Game_Memory
 
 update :: proc() {
-	// Update that happen no matter where the mouse is
+	g.debug_observe = make([dynamic]cstring, 0, 100, allocator = context.temp_allocator)
+	// Process inputs
 	{
-		g.debug_observe = make([dynamic]cstring, 0, 100, allocator = context.temp_allocator)
+		is_ctrl_down :=
+			rl.IsKeyDown(.LEFT_CONTROL) || rl.IsKeyDown(.RIGHT_CONTROL) || rl.IsKeyDown(.CAPS_LOCK)
+		is_shift_down := rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT)
 
-		if rl.IsKeyPressed(.ESCAPE) {
-			g.run = false
+		backspaces := 0
+		lefts := 0
+		rights := 0
+		INPUT_READING: for {
+			key := rl.GetKeyPressed()
+			#partial switch key {
+			case .KEY_NULL:
+				break INPUT_READING
+			case .BACKSPACE:
+				backspaces += 1
+			case .LEFT:
+				lefts += 1
+			case .RIGHT:
+				rights += 1
+			}
 		}
 
+		strings.builder_reset(&g.input_text)
+		input_text_fill()
+
+		switch g.focus {
+		case .Nothing:
+			if rl.IsKeyPressed(.ESCAPE) {
+				g.run = false
+			}
+
+			if rl.IsKeyPressed(.V) && is_ctrl_down {
+				clipboard_paste()
+			}
+
+			if rl.IsKeyPressed(.N) {
+				toggle_noops()
+			}
+
+			if rl.IsKeyPressed(.F) && is_ctrl_down {
+				g.focus = .Search
+			}
+		case .Search:
+			if rl.IsKeyPressed(.ESCAPE) {
+				g.focus = .Nothing
+			}
+			if rl.IsKeyPressed(.F) && is_ctrl_down {
+				g.focus = .Nothing
+			}
+			if rl.IsKeyPressed(.A) && is_ctrl_down {
+				g.search_textbox_state.selection = {len(g.search_query), 0}
+			}
+			if lefts > 0 || rights > 0 {
+				move: textedit.Translation = lefts > 0 ? .Left : .Right
+				number := lefts > 0 ? lefts : rights
+				if is_shift_down {
+					for _ in 0 ..< number {
+						textedit.select_to(&g.search_textbox_state, move)
+					}
+				} else {
+					for _ in 0 ..< number {
+						textedit.move_to(&g.search_textbox_state, move)
+					}
+				}
+			}
+			if strings.builder_len(g.input_text) > 0 {
+				textedit.input_text(&g.search_textbox_state, strings.to_string(g.input_text))
+			}
+			g.search_query = strings.to_string(g.search_textbox_state.builder^)
+			if backspaces > 0 && len(g.search_query) > 0 {
+				for _ in 0 ..< backspaces {
+					textedit.delete_to(&g.search_textbox_state, .Left)
+				}
+			}
+		}
 		if rl.IsKeyPressed(.F4) {
 			g.graph.draw_gutters = !g.graph.draw_gutters
 		}
@@ -84,16 +168,8 @@ update :: proc() {
 			g.debug_show = !g.debug_show
 		}
 
-		if rl.IsKeyPressed(.V) && rl.IsKeyDown(.LEFT_CONTROL) {
-			clipboard_paste()
-		}
-
-		if rl.IsKeyPressed(.N) {
-			toggle_noops()
-		}
-
-		// Search
 		g.search_element_last_id = 0
+		g.search_text_hilhglight_container_id = 0
 	}
 
 	mouse_pos := rl.GetMousePosition()
@@ -108,10 +184,10 @@ update :: proc() {
 		// MOUSE IN GRAPH
 		clay.SetCurrentContext(g.clay_graph_context)
 		clay.SetLayoutDimensions({g.graph.size_px.x + 200, 9999999})
-		if rl.IsKeyPressed(.D) {
-			g.clay_graph_debug_mode = !g.clay_graph_debug_mode
-			clay.SetDebugModeEnabled(g.clay_graph_debug_mode)
-		}
+		// if rl.IsKeyPressed(.D) {
+		// 	g.clay_graph_debug_mode = !g.clay_graph_debug_mode
+		// 	clay.SetDebugModeEnabled(g.clay_graph_debug_mode)
+		// }
 		observe_debug(fmt.ctprintf("graph offset: %v", g.graph_offset))
 		mouse_in_graph_editor := rl.GetScreenToWorld2D(
 			mouse_pos - (g.graph_offset * g.camera.zoom),
@@ -204,6 +280,7 @@ update :: proc() {
 
 draw :: proc() {
 	clay.SetCurrentContext(g.clay_ui_context)
+	layout_ui_create()
 	ui_render_commands: clay.ClayArray(clay.RenderCommand) = layout_ui_create()
 	rl.BeginDrawing()
 	clay_raylib_render(&ui_render_commands)
@@ -280,8 +357,13 @@ game_init :: proc() {
 	loadFont(FONT_ID_TITLE_32, 32, "assets/iosevka.ttf")
 	loadFont(FONT_ID_TITLE_56, 56, "assets/iosevka.ttf")
 
+	builder := strings.builder_from_bytes(g.search_buffer[:])
+	// non_zero_resize(&builder.buf, 256)
+	g.search_textbox_state.builder = &builder
+
+	g.input_text = strings.builder_from_bytes(g.input_text_buf[:])
+
 	game_hot_reloaded(g)
-	g.search_query = "IAB"
 }
 
 @(export)

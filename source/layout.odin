@@ -2,13 +2,15 @@ package game
 
 import "base:runtime"
 import clay "clay-odin"
+// import "core:log"
 import "core:strings"
+import textedit "core:text/edit"
 import hm "handle_map"
-
 
 COLOR_MODIFIER := clay.Color{20, 20, 20, 0}
 WHITE := clay.Color{255, 255, 255, 255}
 BLACK := clay.Color{0, 0, 0, 255}
+GRAY := clay.Color{128, 128, 128, 255}
 
 CHARCOAL := clay.Color{38, 70, 83, 255}
 CHARCOAL_H := CHARCOAL + COLOR_MODIFIER
@@ -53,17 +55,21 @@ TOOLTIP_BACKGROUND := SAFFRON
 TOOLTIP_BORDER := SAFFRON_H
 
 COLOR_HIGHLIGHT_SEARCH := WHITE
+COLOR_TEXT_SELECT := BURNT_SIENNA
 
 layout_text :: proc(text: string, config: ^clay.TextElementConfig) {
-	if strings.contains(text, g.search_query) {
-		if clay.UI()({id = clay.ID("TextHighlightContainer", g.search_element_last_id)}) {
+	if len(g.search_query) > 0 && strings.contains(text, g.search_query) {
+		if clay.UI()(
+		{id = clay.ID("TextHighlightContainer", g.search_text_hilhglight_container_id)},
+		) {
+			g.search_text_hilhglight_container_id += 1
 			text := text
 			i := 0
 			for {
 				part := text[i:]
 				idx := strings.index(part, g.search_query)
 				if idx < 0 {
-					if len(text) > 0 {
+					if len(part) > 0 {
 						clay.TextDynamic(part, config)
 					}
 					break
@@ -302,6 +308,11 @@ layout_ui_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
 			},
 			) {}
 		}
+
+		if g.focus == .Search {
+			layout_search()
+		}
+
 		if clay.UI()(
 		{
 			id = clay.ID("MainWorkspace"),
@@ -318,6 +329,7 @@ layout_ui_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
 				layout = {
 					sizing = {width = clay.SizingFit({}), height = clay.SizingGrow({})},
 					padding = {8, 8, 8, 8},
+					layoutDirection = .TopToBottom,
 				},
 				backgroundColor = COLOR_BACKGROUND,
 			},
@@ -356,6 +368,7 @@ layout_ui_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
 						),
 					)
 				}
+
 			}
 			if clay.UI()(
 			{
@@ -381,6 +394,85 @@ layout_ui_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
 		}
 	}
 	return clay.EndLayout()
+}
+
+layout_search :: proc() {
+	if clay.UI()(
+	{
+		id = clay.ID("SearchBar"),
+		layout = {
+			childGap = 16,
+			sizing = {width = clay.SizingGrow({}), height = clay.SizingFixed(50)},
+		},
+		cornerRadius = {topLeft = 8, topRight = 8, bottomLeft = 0, bottomRight = 0},
+		backgroundColor = COLOR_BACKGROUND,
+	},
+	) {
+		border := clay.BorderElementConfig {
+			width = {left = 2, right = 2, top = 2, bottom = 2},
+			color = COLOR_NODE_BORDER_H,
+		}
+
+		if clay.UI()(
+		{
+			id = clay.ID("SearchBox"),
+			layout = {
+				sizing = {width = clay.SizingGrow({}), height = clay.SizingFit({})},
+				padding = {8, 8, 8, 8},
+				childAlignment = {y = .Center},
+			},
+			border = border,
+		},
+		) {
+			clay.Text(
+				"Search: ",
+				clay.TextConfig({textColor = GRAY, fontSize = 32, fontId = FONT_ID_TITLE_32}),
+			)
+			if clay.UI()(
+			{
+				id = clay.ID("SearchTextbox"),
+				layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingFixed(32)}},
+			},
+			) {
+				search_text_config := clay.TextConfig(
+					{textColor = BLACK, fontSize = 32, fontId = FONT_ID_TITLE_32},
+				)
+				lo, hi := textedit.sorted_selection(&g.search_textbox_state)
+				if lo != hi {
+					clay.TextDynamic(g.search_query[:lo], search_text_config)
+					if clay.UI()(
+					{id = clay.ID("SearchHighlight"), backgroundColor = COLOR_TEXT_SELECT},
+					) {
+						clay.TextDynamic(g.search_query[lo:hi], search_text_config)
+					}
+					clay.TextDynamic(g.search_query[hi:], search_text_config)
+				} else {
+					cursor_pos := lo
+					if clay.UI()({id = clay.ID("SearchBeforeCursor")}) {
+						clay.TextDynamic(g.search_query[:cursor_pos], search_text_config)
+					}
+					clay.TextDynamic(g.search_query[cursor_pos:], search_text_config)
+					// Cursor
+					if clay.UI()(
+					{
+						id = clay.ID("SearchCursor"),
+						layout = {
+							sizing = {width = clay.SizingFixed(1), height = clay.SizingGrow({})},
+						},
+						floating = {
+							attachTo = .Parent,
+							offset = {
+								clay.GetElementData(clay.ID("SearchBeforeCursor")).boundingBox.width,
+								0,
+							},
+						},
+						backgroundColor = COLOR_TEXT_SELECT,
+					},
+					) {}
+				}
+			}
+		}
+	}
 }
 
 layout_graph_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
