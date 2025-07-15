@@ -408,6 +408,7 @@ layout_search :: proc() {
 		backgroundColor = COLOR_BACKGROUND,
 	},
 	) {
+		font_id: u16 = FONT_ID_TITLE_32
 		border := clay.BorderElementConfig {
 			width = {left = 2, right = 2, top = 2, bottom = 2},
 			color = COLOR_NODE_BORDER_H,
@@ -426,7 +427,7 @@ layout_search :: proc() {
 		) {
 			clay.Text(
 				"Search: ",
-				clay.TextConfig({textColor = GRAY, fontSize = 32, fontId = FONT_ID_TITLE_32}),
+				clay.TextConfig({textColor = GRAY, fontSize = 32, fontId = font_id}),
 			)
 			if clay.UI()(
 			{
@@ -435,7 +436,7 @@ layout_search :: proc() {
 			},
 			) {
 				search_text_config := clay.TextConfig(
-					{textColor = BLACK, fontSize = 32, fontId = FONT_ID_TITLE_32},
+					{textColor = BLACK, fontSize = 32, fontId = font_id},
 				)
 				lo, hi := textedit.sorted_selection(&g.search_textbox_state)
 				if lo != hi {
@@ -453,19 +454,14 @@ layout_search :: proc() {
 					}
 					clay.TextDynamic(g.search_query[cursor_pos:], search_text_config)
 					// Cursor
+					before_cursor_text_width := measure_text(g.search_query[:cursor_pos], font_id)
 					if clay.UI()(
 					{
 						id = clay.ID("SearchCursor"),
 						layout = {
 							sizing = {width = clay.SizingFixed(1), height = clay.SizingGrow({})},
 						},
-						floating = {
-							attachTo = .Parent,
-							offset = {
-								clay.GetElementData(clay.ID("SearchBeforeCursor")).boundingBox.width,
-								0,
-							},
-						},
+						floating = {attachTo = .Parent, offset = {before_cursor_text_width, 0}},
 						backgroundColor = COLOR_TEXT_SELECT,
 					},
 					) {}

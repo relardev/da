@@ -23,7 +23,7 @@ loadFont :: proc(fontId: u16, fontSize: u16, path: cstring) {
 	rl.SetTextureFilter(g.raylib_fonts[fontId].font.texture, rl.TextureFilter.TRILINEAR)
 }
 
-measure_text :: proc "c" (
+measure_text_clay :: proc "c" (
 	text: clay.StringSlice,
 	config: ^clay.TextElementConfig,
 	userData: rawptr,
@@ -45,4 +45,24 @@ measure_text :: proc "c" (
 	}
 
 	return {width = line_width / 2, height = f32(config.fontSize)}
+}
+
+measure_text :: proc(text: string, fontID: u16) -> f32 {
+	line_width: f32 = 0
+
+	font := g.raylib_fonts[fontID].font
+
+	for char in text {
+		glyph_index := char - 32
+
+		glyph := font.glyphs[glyph_index]
+
+		if glyph.advanceX != 0 {
+			line_width += f32(glyph.advanceX)
+		} else {
+			line_width += font.recs[glyph_index].width + f32(glyph.offsetX)
+		}
+	}
+
+	return line_width / 2
 }

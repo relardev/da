@@ -280,7 +280,6 @@ update :: proc() {
 
 draw :: proc() {
 	clay.SetCurrentContext(g.clay_ui_context)
-	layout_ui_create()
 	ui_render_commands: clay.ClayArray(clay.RenderCommand) = layout_ui_create()
 	rl.BeginDrawing()
 	clay_raylib_render(&ui_render_commands)
@@ -413,14 +412,14 @@ game_hot_reloaded :: proc(mem: rawptr) {
 		{cast(f32)rl.GetScreenWidth(), cast(f32)rl.GetScreenHeight()},
 		{handler = errorHandler},
 	)
-	clay.SetMeasureTextFunction(measure_text, nil)
+	clay.SetMeasureTextFunction(measure_text_clay, nil)
 
 	g.clay_graph_context = clay.Initialize(
 		g.clay_graph_arena,
 		{999999, 999999},
 		{handler = errorHandler},
 	)
-	clay.SetMeasureTextFunction(measure_text, nil)
+	clay.SetMeasureTextFunction(measure_text_clay, nil)
 }
 
 @(export)

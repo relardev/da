@@ -10,7 +10,7 @@ fill_node_sizes :: proc() {
 		cast([^]u8)g.clay_node_memory,
 	)
 	clay.Initialize(clay_node_arena, {9999999, 9999999}, {handler = errorHandler})
-	clay.SetMeasureTextFunction(measure_text, nil)
+	clay.SetMeasureTextFunction(measure_text_clay, nil)
 	clay.BeginLayout()
 	if clay.UI()(
 	{
