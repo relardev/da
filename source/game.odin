@@ -76,6 +76,7 @@ update :: proc() {
 		backspaces := 0
 		lefts := 0
 		rights := 0
+		deletes := 0
 		INPUT_READING: for {
 			key := rl.GetKeyPressed()
 			#partial switch key {
@@ -83,6 +84,8 @@ update :: proc() {
 				break INPUT_READING
 			case .BACKSPACE:
 				backspaces += 1
+			case .DELETE:
+				deletes += 1
 			case .LEFT:
 				lefts += 1
 			case .RIGHT:
@@ -133,13 +136,21 @@ update :: proc() {
 					}
 				}
 			}
+
+
 			if strings.builder_len(g.input_text) > 0 {
 				textedit.input_text(&g.search_textbox_state, strings.to_string(g.input_text))
 			}
 			g.search_query = strings.to_string(g.search_textbox_state.builder^)
+
 			if backspaces > 0 && len(g.search_query) > 0 {
 				for _ in 0 ..< backspaces {
 					textedit.delete_to(&g.search_textbox_state, .Left)
+				}
+			}
+			if deletes > 0 && len(g.search_query) > 0 {
+				for _ in 0 ..< deletes {
+					textedit.delete_to(&g.search_textbox_state, .Right)
 				}
 			}
 		}
