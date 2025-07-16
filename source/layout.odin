@@ -2,6 +2,7 @@ package game
 
 import "base:runtime"
 import clay "clay-odin"
+// import "core:fmt"
 // import "core:log"
 import "core:strings"
 import textedit "core:text/edit"
@@ -309,7 +310,7 @@ layout_ui_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
 			) {}
 		}
 
-		if g.focus == .Search {
+		if g.search_query != "" || g.focus == .Search {
 			layout_search()
 		}
 
@@ -411,7 +412,7 @@ layout_search :: proc() {
 		font_id: u16 = FONT_ID_TITLE_32
 		border := clay.BorderElementConfig {
 			width = {left = 2, right = 2, top = 2, bottom = 2},
-			color = COLOR_NODE_BORDER_H,
+			color = g.focus == .Search ? COLOR_NODE_BORDER_H : {},
 		}
 
 		if clay.UI()(
@@ -425,6 +426,12 @@ layout_search :: proc() {
 			border = border,
 		},
 		) {
+			clay.OnHover(proc "c" (id: clay.ElementId, pd: clay.PointerData, _: rawptr) {
+					context = runtime.default_context()
+					if pd.state == .PressedThisFrame {
+						g.focus = .Search
+					}
+				}, nil)
 			clay.Text(
 				"Search: ",
 				clay.TextConfig({textColor = GRAY, fontSize = 32, fontId = font_id}),
@@ -435,36 +442,86 @@ layout_search :: proc() {
 				layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingFixed(32)}},
 			},
 			) {
-				search_text_config := clay.TextConfig(
-					{textColor = BLACK, fontSize = 32, fontId = font_id},
-				)
-				lo, hi := textedit.sorted_selection(&g.search_textbox_state)
-				if lo != hi {
-					clay.TextDynamic(g.search_query[:lo], search_text_config)
-					if clay.UI()(
-					{id = clay.ID("SearchHighlight"), backgroundColor = COLOR_TEXT_SELECT},
-					) {
-						clay.TextDynamic(g.search_query[lo:hi], search_text_config)
-					}
-					clay.TextDynamic(g.search_query[hi:], search_text_config)
-				} else {
-					cursor_pos := lo
-					if clay.UI()({id = clay.ID("SearchBeforeCursor")}) {
-						clay.TextDynamic(g.search_query[:cursor_pos], search_text_config)
-					}
-					clay.TextDynamic(g.search_query[cursor_pos:], search_text_config)
-					// Cursor
-					before_cursor_text_width := measure_text(g.search_query[:cursor_pos], font_id)
-					if clay.UI()(
-					{
-						id = clay.ID("SearchCursor"),
-						layout = {
-							sizing = {width = clay.SizingFixed(1), height = clay.SizingGrow({})},
-						},
-						floating = {attachTo = .Parent, offset = {before_cursor_text_width, 0}},
-						backgroundColor = COLOR_TEXT_SELECT,
+				clay.OnHover(
+					proc "c" (id: clay.ElementId, pd: clay.PointerData, _: rawptr) {
+						context = runtime.default_context()
+						if pd.state == .Released || pd.state == .ReleasedThisFrame {
+							return
+						}
+						data := clay.GetElementData(id)
+						offset_in_text := pd.position.x - data.boundingBox.x
+						half_codepoint_width := measure_text(" ", FONT_ID_TITLE_32) / 2
+						selection_updated := false
+						new_selection := 0
+						for _, i in g.search_query {
+							if measure_text(g.search_query[:i], FONT_ID_TITLE_32) +
+								   half_codepoint_width >=
+							   offset_in_text {
+								new_selection = i
+								selection_updated = true
+								break
+							}
+						}
+						if !selection_updated {
+							new_selection = len(g.search_query)
+						}
+						if pd.state == .Pressed {
+							old_selection := g.search_textbox_state.selection
+							g.search_textbox_state.selection = {new_selection, old_selection[1]}
+						} else {
+							// pd.state == .PressedThisFrame
+							g.search_textbox_state.selection = {new_selection, new_selection}
+						}
 					},
-					) {}
+					nil,
+				)
+				if g.focus == .Search {
+					search_text_config := clay.TextConfig(
+						{textColor = BLACK, fontSize = 32, fontId = font_id},
+					)
+					lo, hi := textedit.sorted_selection(&g.search_textbox_state)
+					if lo != hi {
+						clay.TextDynamic(g.search_query[:lo], search_text_config)
+						if clay.UI()(
+						{id = clay.ID("SearchHighlight"), backgroundColor = COLOR_TEXT_SELECT},
+						) {
+							clay.TextDynamic(g.search_query[lo:hi], search_text_config)
+						}
+						clay.TextDynamic(g.search_query[hi:], search_text_config)
+					} else {
+						cursor_pos := lo
+						if clay.UI()({id = clay.ID("SearchBeforeCursor")}) {
+							clay.TextDynamic(g.search_query[:cursor_pos], search_text_config)
+						}
+						clay.TextDynamic(g.search_query[cursor_pos:], search_text_config)
+						// Cursor
+						before_cursor_text_width := measure_text(
+							g.search_query[:cursor_pos],
+							font_id,
+						)
+						if clay.UI()(
+						{
+							id = clay.ID("SearchCursor"),
+							layout = {
+								sizing = {
+									width = clay.SizingFixed(1),
+									height = clay.SizingGrow({}),
+								},
+							},
+							floating = {
+								attachTo = .Parent,
+								offset = {before_cursor_text_width, 0},
+							},
+							backgroundColor = COLOR_TEXT_SELECT,
+						},
+						) {}
+					}
+				} else {
+					// search not focused, just draw text
+					clay.TextDynamic(
+						g.search_query,
+						clay.TextConfig({textColor = BLACK, fontSize = 32, fontId = font_id}),
+					)
 				}
 			}
 		}

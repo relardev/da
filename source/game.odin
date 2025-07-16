@@ -113,6 +113,10 @@ update :: proc() {
 			if rl.IsKeyPressed(.F) && is_ctrl_down {
 				g.focus = .Search
 			}
+			if rl.IsKeyPressed(.D) {
+				g.clay_ui_debug_mode = !g.clay_ui_debug_mode
+				clay.SetDebugModeEnabled(g.clay_ui_debug_mode)
+			}
 		case .Search:
 			if rl.IsKeyPressed(.ESCAPE) {
 				g.focus = .Nothing
@@ -281,10 +285,6 @@ update :: proc() {
 	} else {
 		// MOUSE IN UI
 		clay.UpdateScrollContainers(false, rl.GetMouseWheelMoveV(), rl.GetFrameTime())
-		if rl.IsKeyPressed(.D) {
-			g.clay_ui_debug_mode = !g.clay_ui_debug_mode
-			clay.SetDebugModeEnabled(g.clay_ui_debug_mode)
-		}
 	}
 	g.prev_mouse_pos = mouse_pos
 }
