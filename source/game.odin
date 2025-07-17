@@ -70,7 +70,12 @@ update :: proc() {
 	// Process inputs
 	{
 		is_ctrl_down :=
-			rl.IsKeyDown(.LEFT_CONTROL) || rl.IsKeyDown(.RIGHT_CONTROL) || rl.IsKeyDown(.CAPS_LOCK)
+			rl.IsKeyDown(.LEFT_CONTROL) ||
+			rl.IsKeyDown(.RIGHT_CONTROL) ||
+			rl.IsKeyDown(.CAPS_LOCK) ||
+			rl.IsKeyDown(.LEFT_SUPER) ||
+			rl.IsKeyDown(.RIGHT_SUPER)
+
 		is_shift_down := rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT)
 
 		backspaces := 0
