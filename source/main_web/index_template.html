@@ -7,7 +7,7 @@
 	<title>Odin + Raylib on the web</title>
 	<meta name="title" content="Odin + Raylib on the web">
 	<meta name="description" content="Make games using Odin + Raylib that work in the browser">
-	<meta name="viewport" content="width=device-width">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
 	<style>
 		body { 
@@ -23,6 +23,13 @@
 			margin-left: auto;
 			margin-right: auto;
 			display: block;
+			width: 100vw !important;
+			height: 100vh !important;
+		}
+		html {
+			-ms-text-size-adjust: none;
+			-webkit-text-size-adjust: none;
+			text-size-adjust: none;
 		}
 	</style>
 </head>
@@ -31,6 +38,32 @@
 	<script type="text/javascript" src="odin.js"></script>
 	<script type="text/javascript" src="app_hotkeys.js"></script>
 	<script>
+		// Common function for setting canvas size with proper pixel ratio
+		function setCanvasSize() {
+			const canvas = document.getElementById('canvas');
+			const pixelRatio = window.devicePixelRatio || 1;
+			
+			// Get the viewport dimensions
+			const width = window.innerWidth;
+			const height = window.innerHeight;
+			
+			// Set physical size of canvas
+			canvas.width = width * pixelRatio;
+			canvas.height = height * pixelRatio;
+			
+			// Set display size
+			canvas.style.width = width + 'px';
+			canvas.style.height = height + 'px';
+			
+			console.log(`Canvas size set to ${canvas.width}x${canvas.height} (pixel ratio: ${pixelRatio})`);
+			
+			// Return the physical dimensions
+			return { width: canvas.width, height: canvas.height };
+		}
+		
+		// Set canvas size immediately, before any other code runs
+		setCanvasSize();
+	
 		var key_input_stack = [];
 		var odinMemoryInterface = new odin.WasmMemoryInterface();
 		odinMemoryInterface.setIntSize(4);
@@ -86,21 +119,36 @@
 			onRuntimeInitialized: () => {
 				var e = wasmExports;
 
+				// Set canvas size explicitly to ensure it's at the right resolution
+				function send_resize() {
+					const dims = setCanvasSize();
+					e.web_window_size_changed(dims.width, dims.height);
+				}
+				
+				// Make sure canvas is sized correctly before initializing Odin code
+				setCanvasSize();
+
 				// Calls any procedure marked with @init
 				e._start();
 
 				// See source/main_web/main_web.odin for main_start,
 				// main_update and main_end.
 				e.main_start();
+				
+				// Send initial resize with the correct dimensions
+				send_resize();
 
-				function send_resize() {
-					var canvas = document.getElementById('canvas');
-					e.web_window_size_changed(canvas.width, canvas.height);
-				}
-
-				window.addEventListener('resize', function(event) {
-					send_resize();
-				}, true);
+				// Handle window resizing
+				window.addEventListener('resize', send_resize, true);
+				
+				// Handle zoom by watching for changes to devicePixelRatio
+				let lastPixelRatio = window.devicePixelRatio;
+				setInterval(() => {
+					if (window.devicePixelRatio !== lastPixelRatio) {
+						lastPixelRatio = window.devicePixelRatio;
+						send_resize();
+					}
+				}, 250); // Check every 250ms
 
 				// Keydown event handling
 				window.addEventListener('keydown', e => {
@@ -133,7 +181,7 @@
 				// This can probably be done better: Ideally we'd feed the
 				// initial size to `main_start`. But there seems to be a
 				// race condition. `canvas` doesn't have it's correct size yet.
-				send_resize();
+				// No need for timeout as we now handle sizing explicitly
 
 				// Runs the "main loop".
 				function do_main_update() {
