@@ -27,14 +27,15 @@
 	</style>
 </head>
 <body>
-	<canvas class="game_canvas" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1" onmousedown="event.target.focus()" onkeydown="event.preventDefault()"></canvas>
+	<canvas class="game_canvas" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1" onmousedown="event.target.focus()"></canvas>
 	<script type="text/javascript" src="odin.js"></script>
+	<script type="text/javascript" src="app_hotkeys.js"></script>
 	<script>
 		var key_input_stack = [];
 		var odinMemoryInterface = new odin.WasmMemoryInterface();
 		odinMemoryInterface.setIntSize(4);
 		var odinImports = odin.setupDefaultImports(odinMemoryInterface);
-
+		
 		// The Module is used as configuration for emscripten.
 		var Module = {
 			// This is called by emscripten when it starts up.
@@ -42,32 +43,35 @@
 				const newImports = {
 					...odinImports,
 					...imports
-				}
+				};
 
 				newImports.env.js_get_key = function(ptr) {
+					console.log('js_get_key called, stack:', key_input_stack.length > 0 ? key_input_stack[0] : 0);
 					return key_input_stack.length > 0 ? key_input_stack.shift() : 0;
-				}
+				};
+				
 				newImports.env.js_paste_from_clipboard = function(ptr) {
-						// Ensure a user gesture triggers this function!
-						navigator.clipboard.readText().then(function(text) {
-								// Convert text to UTF-8 bytes
-								// let text = "This is a test";
-								if (text.length >= 100*1024) {
-									console.error("Text too long for clipboard paste callback");
-									return; // Prevent buffer overflow
-								}
-								const encoder = new TextEncoder();
-								const utf8 = encoder.encode(text);
+					// Ensure a user gesture triggers this function!
+					navigator.clipboard.readText().then(function(text) {
+						// Convert text to UTF-8 bytes
+						if (text.length >= 100*1024) {
+							console.error("Text too long for clipboard paste callback");
+							return; // Prevent buffer overflow
+						}
+						const encoder = new TextEncoder();
+						const utf8 = encoder.encode(text);
 
-								// Write bytes to WASM memory
-								const wasmMemory = odinMemoryInterface.memory;
-								const memView = new Uint8Array(wasmMemory.buffer, ptr, utf8.length);
-								memView.set(utf8);
+						// Write bytes to WASM memory
+						const wasmMemory = odinMemoryInterface.memory;
+						const memView = new Uint8Array(wasmMemory.buffer, ptr, utf8.length);
+						memView.set(utf8);
 
-								// Odin callback, must be exported (e.g., @(export, link_name="paste_callback"))
-								const paste_callback = odinMemoryInterface.exports.paste_callback;
-								paste_callback(utf8.length);
-						});
+						// Odin callback, must be exported (e.g., @(export, link_name="paste_callback"))
+						const paste_callback = odinMemoryInterface.exports.paste_callback;
+						paste_callback(utf8.length);
+					}).catch(function(err) {
+						console.error("Clipboard paste error:", err);
+					});
 				};
 
 				return WebAssembly.instantiateStreaming(fetch("index.wasm"), newImports).then(function(output) {
@@ -98,14 +102,31 @@
 					send_resize();
 				}, true);
 
-				// js_get_key
+				// Keydown event handling
 				window.addEventListener('keydown', e => {
-					if (e.ctrlKey || e.altKey || e.metaKey) {
+					console.log('Keydown event:', e.key, 'Ctrl:', e.ctrlKey, 'Alt:', e.altKey, 'Shift:', e.shiftKey);
+					
+					// Check if this is an app hotkey
+					if (matchesHotkey(e, appHotkeys)) {
+						e.preventDefault(); // Prevent default browser behavior
+						console.log('App hotkey captured:', e.key);
 						return;
-    }
-					if (e.key.length === 1) for (const cp of e.key) key_input_stack.push(cp.codePointAt(0));
+					}
+					
+					// Handle regular text input (single printable characters)
+					if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+						e.preventDefault(); // Prevent default browser behavior
+						console.log('Text character captured:', e.key);
+						for (const cp of e.key) key_input_stack.push(cp.codePointAt(0));
+						return;
+					}
+					
+					// Let browser handle all other key combinations
+					console.log('Letting browser handle:', e.key);
 				});
+				
 				window.addEventListener('input', e => {
+					console.log('Input event:', e.data);
 					if (e.data) for (const cp of e.data) key_input_stack.push(cp.codePointAt(0));
 				});
 

@@ -23,6 +23,7 @@ odin build source/main_web -target:js_wasm32 -build-mode:obj -define:RAYLIB_WASM
 ODIN_PATH=$(odin root)
 
 cp $ODIN_PATH/core/sys/wasm/js/odin.js $OUT_DIR
+cp source/main_web/app_hotkeys.js $OUT_DIR
 
 files="$OUT_DIR/game.wasm.o source/clay-odin/wasm/clay.o ${ODIN_PATH}/vendor/raylib/wasm/libraylib.a ${ODIN_PATH}/vendor/raylib/wasm/libraygui.a"
 
