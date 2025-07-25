@@ -359,6 +359,7 @@ layout_ui_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
 					clay.OnHover(proc "c" (id: clay.ElementId, pd: clay.PointerData, _: rawptr) {
 							context = runtime.default_context()
 							if pd.state == .PressedThisFrame {
+								g.needs_redraw = true
 								toggle_noops()
 							}
 						}, nil)
@@ -415,6 +416,14 @@ layout_search :: proc() {
 			color = g.focus == .Search ? COLOR_NODE_BORDER_H : {},
 		}
 
+		search_textbox_id := clay.ID("SearchTextbox")
+
+		if g.mouse_interacting_with_id == search_textbox_id && g.focus == .Search {
+			current_position := update_text_selection(search_textbox_id, g.mouse_position)
+
+			g.search_textbox_state.selection[0] = current_position
+		}
+
 		if clay.UI()(
 		{
 			id = clay.ID("SearchBox"),
@@ -429,6 +438,7 @@ layout_search :: proc() {
 			clay.OnHover(proc "c" (id: clay.ElementId, pd: clay.PointerData, _: rawptr) {
 					context = runtime.default_context()
 					if pd.state == .PressedThisFrame {
+						g.needs_redraw = true
 						g.focus = .Search
 					}
 				}, nil)
@@ -438,43 +448,20 @@ layout_search :: proc() {
 			)
 			if clay.UI()(
 			{
-				id = clay.ID("SearchTextbox"),
+				id = search_textbox_id,
 				layout = {sizing = {width = clay.SizingGrow({}), height = clay.SizingFixed(32)}},
 			},
 			) {
-				clay.OnHover(
-					proc "c" (id: clay.ElementId, pd: clay.PointerData, _: rawptr) {
+				clay.OnHover(proc "c" (id: clay.ElementId, pd: clay.PointerData, _: rawptr) {
 						context = runtime.default_context()
-						if pd.state == .Released || pd.state == .ReleasedThisFrame {
-							return
+						if pd.state == .PressedThisFrame {
+							g.needs_redraw = true
+							g.mouse_interacting_with_id = id
+
+							current_position := update_text_selection(id, pd.position)
+							g.search_textbox_state.selection = {current_position, current_position}
 						}
-						data := clay.GetElementData(id)
-						offset_in_text := pd.position.x - data.boundingBox.x
-						half_codepoint_width := measure_text(" ", FONT_ID_TITLE_32) / 2
-						selection_updated := false
-						new_selection := 0
-						for _, i in g.search_query {
-							if measure_text(g.search_query[:i], FONT_ID_TITLE_32) +
-								   half_codepoint_width >=
-							   offset_in_text {
-								new_selection = i
-								selection_updated = true
-								break
-							}
-						}
-						if !selection_updated {
-							new_selection = len(g.search_query)
-						}
-						if pd.state == .Pressed {
-							old_selection := g.search_textbox_state.selection
-							g.search_textbox_state.selection = {new_selection, old_selection[1]}
-						} else {
-							// pd.state == .PressedThisFrame
-							g.search_textbox_state.selection = {new_selection, new_selection}
-						}
-					},
-					nil,
-				)
+					}, nil)
 				if g.focus == .Search {
 					search_text_config := clay.TextConfig(
 						{textColor = BLACK, fontSize = 32, fontId = font_id},
@@ -557,4 +544,27 @@ layout_graph_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
 		}
 	}
 	return clay.EndLayout()
+}
+
+
+update_text_selection :: proc(id: clay.ElementId, mouse_position: Vec2) -> int {
+	data := clay.GetElementData(id)
+	offset_in_text := mouse_position.x - data.boundingBox.x
+	half_codepoint_width := measure_text(" ", FONT_ID_TITLE_32) / 2
+
+	new_selection := 0
+	selection_updated := false
+	for _, i in g.search_query {
+		if measure_text(g.search_query[:i], FONT_ID_TITLE_32) + half_codepoint_width >=
+		   offset_in_text {
+			new_selection = i
+			selection_updated = true
+			break
+		}
+	}
+	if !selection_updated {
+		new_selection = len(g.search_query)
+	}
+
+	return new_selection
 }

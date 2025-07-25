@@ -57,6 +57,8 @@ Game_Memory :: struct {
 	input_text:                          strings.Builder,
 	focus:                               Element,
 	needs_redraw:                        bool,
+	mouse_interacting_with_id:           clay.ElementId,
+	mouse_position:                      Vec2,
 }
 
 Element :: enum {
@@ -70,6 +72,8 @@ update :: proc() {
 	g.debug_observe = make([dynamic]cstring, 0, 100, allocator = context.temp_allocator)
 	// Process inputs
 	{
+		g.mouse_position = rl.GetMousePosition()
+
 		is_ctrl_down :=
 			rl.IsKeyDown(.LEFT_CONTROL) ||
 			rl.IsKeyDown(.RIGHT_CONTROL) ||
@@ -206,9 +210,14 @@ update :: proc() {
 
 		g.search_element_last_id = 0
 		g.search_text_hilhglight_container_id = 0
+
+		if g.mouse_interacting_with_id != {} && !rl.IsMouseButtonDown(.LEFT) {
+			g.mouse_interacting_with_id = {}
+		}
 	}
 
-	mouse_pos := rl.GetMousePosition()
+	mouse_pos := g.mouse_position
+
 	observe_debug(fmt.ctprintf("Mouse: [%.2f, %.2f]", mouse_pos.x, mouse_pos.y))
 	g.graph_selected_node = {}
 	clay.SetCurrentContext(g.clay_ui_context)
