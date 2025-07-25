@@ -56,6 +56,7 @@ Game_Memory :: struct {
 	input_text_buf:                      [1024]u8,
 	input_text:                          strings.Builder,
 	focus:                               Element,
+	needs_redraw:                        bool,
 }
 
 Element :: enum {
@@ -84,9 +85,12 @@ update :: proc() {
 		deletes := 0
 		INPUT_READING: for {
 			key := rl.GetKeyPressed()
-			#partial switch key {
-			case .KEY_NULL:
+			if key == .KEY_NULL {
 				break INPUT_READING
+			}
+
+			g.needs_redraw = true
+			#partial switch key {
 			case .BACKSPACE:
 				backspaces += 1
 			case .DELETE:
@@ -103,33 +107,40 @@ update :: proc() {
 
 		switch g.focus {
 		case .Nothing:
-			if rl.IsKeyPressed(.ESCAPE) {
-				g.run = false
-			}
+			// if rl.IsKeyPressed(.ESCAPE) {
+			// 	g.run = false
+			// }
 
 			if rl.IsKeyPressed(.V) && is_ctrl_down {
+				g.needs_redraw = true
 				clipboard_paste()
 			}
 
 			if rl.IsKeyPressed(.N) {
+				g.needs_redraw = true
 				toggle_noops()
 			}
 
 			if rl.IsKeyPressed(.F) && is_ctrl_down {
+				g.needs_redraw = true
 				g.focus = .Search
 			}
 			if rl.IsKeyPressed(.D) {
+				g.needs_redraw = true
 				g.clay_ui_debug_mode = !g.clay_ui_debug_mode
 				clay.SetDebugModeEnabled(g.clay_ui_debug_mode)
 			}
 		case .Search:
 			if rl.IsKeyPressed(.ESCAPE) {
+				g.needs_redraw = true
 				g.focus = .Nothing
 			}
 			if rl.IsKeyPressed(.F) && is_ctrl_down {
+				g.needs_redraw = true
 				g.focus = .Nothing
 			}
 			if rl.IsKeyPressed(.A) && is_ctrl_down {
+				g.needs_redraw = true
 				g.search_textbox_state.selection = {len(g.search_query), 0}
 			}
 			if lefts > 0 || rights > 0 {
@@ -162,15 +173,19 @@ update :: proc() {
 					textedit.delete_to(&g.search_textbox_state, .Right)
 				}
 			}
+			g.search_query = strings.to_string(g.search_textbox_state.builder^)
 		}
 		if rl.IsKeyPressed(.F4) {
+			g.needs_redraw = true
 			g.graph.draw_gutters = !g.graph.draw_gutters
 		}
 		if rl.IsKeyPressed(.F3) {
+			g.needs_redraw = true
 			g.graph.draw_nodes = !g.graph.draw_nodes
 		}
 
 		if rl.IsKeyPressed(.F2) {
+			g.needs_redraw = true
 			g.debug_draw_camera = !g.debug_draw_camera
 		}
 		if g.debug_draw_camera {
@@ -185,6 +200,7 @@ update :: proc() {
 		}
 
 		if rl.IsKeyPressed(.F1) {
+			g.needs_redraw = true
 			g.debug_show = !g.debug_show
 		}
 
@@ -254,6 +270,7 @@ update :: proc() {
 
 		// Pan
 		if rl.IsMouseButtonDown(.LEFT) {
+			g.needs_redraw = true
 			delta := g.prev_mouse_pos - mouse_pos
 			g.camera.target += delta / g.camera.zoom
 		}
@@ -262,6 +279,7 @@ update :: proc() {
 		// Mouse Wheel stuff
 		{
 			if wheel != 0 {
+				g.needs_redraw = true
 				if rl.IsKeyDown(.LEFT_SHIFT) {
 					clay.UpdateScrollContainers(false, rl.GetMouseWheelMoveV(), rl.GetFrameTime())
 				} else {
@@ -291,13 +309,20 @@ update :: proc() {
 		// MOUSE IN UI
 		clay.UpdateScrollContainers(false, rl.GetMouseWheelMoveV(), rl.GetFrameTime())
 	}
-	g.prev_mouse_pos = mouse_pos
+	if g.prev_mouse_pos != mouse_pos {
+		g.needs_redraw = true
+		g.prev_mouse_pos = mouse_pos
+	}
 }
 
 draw :: proc() {
+	rl.BeginDrawing()
+	if !g.needs_redraw {
+		rl.EndDrawing()
+		return
+	}
 	clay.SetCurrentContext(g.clay_ui_context)
 	ui_render_commands: clay.ClayArray(clay.RenderCommand) = layout_ui_create()
-	rl.BeginDrawing()
 	clay_raylib_render(&ui_render_commands)
 	if g.debug_show {
 		rl.DrawFPS(10, 10)
@@ -312,6 +337,7 @@ draw :: proc() {
 game_update :: proc() {
 	update()
 	draw()
+	g.needs_redraw = false
 
 	// Everything on tracking allocator is valid until end-of-frame.
 	free_all(context.temp_allocator)
@@ -423,6 +449,8 @@ game_memory_size :: proc() -> int {
 game_hot_reloaded :: proc(mem: rawptr) {
 	g = (^Game_Memory)(mem)
 
+	g.needs_redraw = true
+
 	g.clay_ui_context = clay.Initialize(
 		g.clay_ui_arena,
 		{cast(f32)rl.GetScreenWidth(), cast(f32)rl.GetScreenHeight()},
@@ -451,6 +479,7 @@ game_force_restart :: proc() -> bool {
 // In a web build, this is called when browser changes size. Remove the
 // `rl.SetWindowSize` call if you don't want a resizable game.
 game_parent_window_size_changed :: proc(w, h: int) {
+	g.needs_redraw = true
 	rl.SetWindowSize(i32(w), i32(h))
 }
 
