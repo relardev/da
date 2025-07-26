@@ -11,7 +11,8 @@ import hm "handle_map"
 gutter_edge_distance: f32 = 10.0 // distance between edges in gutters
 gutter_padding: f32 = 40.0 // padding around gutters
 
-RANDOM_SEED: u64 = 0x123456789abcdef0
+RANDOM_SEED :: 0x123456789abcdef0
+GRAPH_X_ALGORITHM :: "barycenter" // "naive", "barycenter"
 
 Graph :: struct {
 	nodes:              hm.Handle_Map(Node, NodeHandle, 1024),
@@ -116,14 +117,42 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 		layers[node.position.y] = layer
 	}
 
-	for i in 0 ..= 10 {
+	// Sort layers so that calculation is stable,
+	// topological sort uses maps which cant be stable
+	// even with resetting random generator seed
+	{
 		for layer in layers {
-			if i % 2 == 0 {
-				graph_unwind_crossings(graph, layer[:], true)
-			} else {
-				graph_unwind_crossings(graph, layer[:], false)
+			slice.sort_by(layer[:], proc(a, b: NodeHandle) -> bool {
+				return a.idx < b.idx
+			})
+		}
+	}
+
+	// Fill x positions
+	if GRAPH_X_ALGORITHM == "naive" {
+		// Barycenter algorithm: calculate barycenter for each node and place them accordingly
+		for layer in layers {
+			if len(layer) == 0 {
+				continue // skip empty layers
+			}
+			// fmt.println("Layer: ", layer)
+			for node_handle, i in layer {
+				node := hm.get(&graph.nodes, node_handle)
+				node.position.x = i32(i)
 			}
 		}
+	} else if GRAPH_X_ALGORITHM == "barycenter" {
+		for i in 0 ..= 10 {
+			for layer in layers {
+				if i % 2 == 0 {
+					graph_unwind_crossings(graph, layer[:], true)
+				} else {
+					graph_unwind_crossings(graph, layer[:], false)
+				}
+			}
+		}
+	} else {
+		panic("Unknown GRAPH_X_ALGORITHM: " + GRAPH_X_ALGORITHM)
 	}
 
 	x_max: i32 = 0
@@ -133,6 +162,7 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 			x_max = node.position.x
 		}
 	}
+
 	graph.gutters_vertical = make([dynamic]Gutter, x_max + 2, allocator = g.recipe_allocator)
 	graph.gutters_horizontal = make([dynamic]Gutter, y_max + 2, allocator = g.recipe_allocator)
 
@@ -303,7 +333,6 @@ graph_unwind_crossings :: proc(graph: ^Graph, layer: []NodeHandle, descending: b
 			center = center,
 			pos    = f32(idx),
 		}
-
 	}
 
 	if descending {

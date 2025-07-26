@@ -2,7 +2,7 @@ package game
 
 import "core:encoding/json"
 import "core:fmt"
-// import "core:log"
+import "core:log"
 import "core:math/rand"
 import "core:mem"
 import hm "handle_map"
@@ -28,6 +28,7 @@ recipe_create_from_pasted :: proc() {
 	g.recipe = new(Recipe, allocator = g.recipe_allocator)
 	err := json.unmarshal(g.pasted[:g.pasted_len + 1], g.recipe, allocator = g.recipe_allocator)
 	if err != nil {
+		log.error("Failed to unmarshal recipe: %v", err)
 		return
 	}
 

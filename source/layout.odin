@@ -1,9 +1,9 @@
+#+vet !unused-imports
 package game
 
-import "base:runtime"
 import clay "clay-odin"
 // import "core:fmt"
-// import "core:log"
+import "core:log"
 import "core:strings"
 import textedit "core:text/edit"
 import hm "handle_map"
@@ -357,7 +357,7 @@ layout_ui_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
 				},
 				) {
 					clay.OnHover(proc "c" (id: clay.ElementId, pd: clay.PointerData, _: rawptr) {
-							context = runtime.default_context()
+							context = g.on_hover_context
 							if pd.state == .PressedThisFrame {
 								g.needs_redraw = true
 								toggle_noops()
@@ -436,7 +436,7 @@ layout_search :: proc() {
 		},
 		) {
 			clay.OnHover(proc "c" (id: clay.ElementId, pd: clay.PointerData, _: rawptr) {
-					context = runtime.default_context()
+					context = g.on_hover_context
 					if pd.state == .PressedThisFrame {
 						g.needs_redraw = true
 						g.focus = .Search
@@ -453,7 +453,7 @@ layout_search :: proc() {
 			},
 			) {
 				clay.OnHover(proc "c" (id: clay.ElementId, pd: clay.PointerData, _: rawptr) {
-						context = runtime.default_context()
+						context = g.on_hover_context
 						if pd.state == .PressedThisFrame {
 							g.needs_redraw = true
 							g.mouse_interacting_with_id = id

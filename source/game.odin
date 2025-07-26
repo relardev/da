@@ -1,9 +1,10 @@
+#+vet !unused-imports
 package game
 
 import "base:runtime"
 import clay "clay-odin"
 import "core:fmt"
-// import "core:log"
+import "core:log"
 import "core:mem"
 import "core:strings"
 import textedit "core:text/edit"
@@ -59,6 +60,7 @@ Game_Memory :: struct {
 	needs_redraw:                        bool,
 	mouse_interacting_with_id:           clay.ElementId,
 	mouse_position:                      Vec2,
+	on_hover_context:                    runtime.Context,
 }
 
 Element :: enum {
@@ -392,6 +394,7 @@ game_init :: proc() {
 		clay_node_memory = clay_node_memory,
 		raylib_fonts = make([dynamic]Raylib_Font, 10),
 		graph = Graph{draw_nodes = true},
+		on_hover_context = context,
 	}
 
 	mem.dynamic_arena_init(&g.recipe_arena, alignment = recipe_arena_align)
