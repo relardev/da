@@ -394,6 +394,10 @@ layout_ui_create :: proc() -> clay.ClayArray(clay.RenderCommand) {
 				) {}
 			}
 		}
+		// Show splash screen if nothing has been pasted yet
+		if g.pasted_len == 0 {
+			layout_splash_screen()
+		}
 	}
 	return clay.EndLayout()
 }
@@ -567,4 +571,92 @@ update_text_selection :: proc(id: clay.ElementId, mouse_position: Vec2) -> int {
 	}
 
 	return new_selection
+}
+
+layout_splash_screen :: proc() {
+	if clay.UI()(
+	{
+		id = clay.ID("SplashOverlay"),
+		layout = {
+			sizing = {
+				width  = clay.SizingFixed(9999), // Very large to cover entire screen
+				height = clay.SizingFixed(9999), // Very large to cover entire screen
+			},
+			childAlignment = {x = .Center, y = .Center},
+		},
+		backgroundColor = clay.Color{0, 0, 0, 180}, // Semi-transparent black
+		floating = {
+			zIndex             = 100, // Place above other elements
+			pointerCaptureMode = .Capture, // Capture all pointer events
+			attachTo           = .Root, // Attach to root element
+			offset             = {-5000, -5000}, // Negative offset to center the large rectangle
+		},
+	},
+	) {
+		if clay.UI()(
+		{
+			id = clay.ID("SplashModal"),
+			layout = {
+				sizing = {
+					width = clay.SizingFit({min = 500, max = 700}),
+					height = clay.SizingFit({min = 350}),
+				},
+				padding = clay.PaddingAll(24),
+				childGap = 16,
+				layoutDirection = .TopToBottom,
+				childAlignment = {x = .Center, y = .Center},
+			},
+			backgroundColor = COLOR_BACKGROUND,
+			cornerRadius = clay.CornerRadiusAll(8),
+			border = {width = clay.BorderOutside(2), color = PERSIAN_GREEN},
+			floating = {
+				zIndex = 101, // Above the overlay
+				attachTo = .Root, // Attach to root element
+				attachment = {element = .CenterCenter, parent = .CenterCenter},
+			},
+		},
+		) {
+			// Title
+			if clay.UI()(
+			{
+				id = clay.ID("SplashTitle"),
+				layout = {
+					sizing = {width = clay.SizingGrow({}), height = clay.SizingFit({})},
+					childAlignment = {x = .Center},
+				},
+			},
+			) {
+				clay.TextDynamic(
+					"Welcome to Recipe Viewer",
+					clay.TextConfig({textColor = WHITE, fontSize = 56, fontId = FONT_ID_TITLE_56}),
+				)
+			}
+
+			// Explanation text
+			if clay.UI()(
+			{
+				id = clay.ID("SplashInstructions"),
+				layout = {
+					sizing = {width = clay.SizingGrow({}), height = clay.SizingFit({})},
+					padding = clay.PaddingAll(8),
+				},
+				backgroundColor = COLOR_BACKGROUND_L,
+				cornerRadius = clay.CornerRadiusAll(4),
+			},
+			) {
+				clay.Text(
+					"Press ctrl+v to paste graph from clipboard",
+					clay.TextConfig(
+						{
+							textColor = WHITE,
+							fontSize = 32,
+							fontId = FONT_ID_TITLE_32,
+							wrapMode = .Words,
+						},
+					),
+				)
+
+			}
+		}
+	}
 }
