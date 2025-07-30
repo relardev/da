@@ -150,11 +150,40 @@
 					}
 				}, 250); // Check every 250ms
 
+				// Track if we're in text input mode
+				let inTextInputMode = false;
+				
+				// Function to query Odin for text input focus state
+				function isTextInputFocused() {
+					// Call the exported Odin function
+					// This function returns 1 if text input is focused, 0 otherwise
+					try {
+						if (typeof odinMemoryInterface.exports.web_is_text_input_focused === 'function') {
+							return odinMemoryInterface.exports.web_is_text_input_focused() === 1;
+						}
+					} catch (e) {
+						console.error("Error checking text input focus:", e);
+					}
+					return false;
+				}
+				
 				// Keydown event handling
 				window.addEventListener('keydown', e => {
-					console.log('Keydown event:', e.key, 'Ctrl:', e.ctrlKey, 'Alt:', e.altKey, 'Shift:', e.shiftKey);
+					// Update text input mode by querying Odin directly
+					inTextInputMode = isTextInputFocused();
 					
-					// Check if this is an app hotkey
+					console.log('Keydown event:', e.key, 'Ctrl:', e.ctrlKey, 'Alt:', e.altKey, 'Shift:', e.shiftKey, 'TextMode:', inTextInputMode);
+					
+					// If we're in text input mode and this is a single character without modifiers
+					// Then always allow it through to the text input handler regardless of hotkey status
+					if (inTextInputMode && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+						e.preventDefault(); // Prevent default browser behavior
+						console.log('Text character captured (in text mode):', e.key);
+						for (const cp of e.key) key_input_stack.push(cp.codePointAt(0));
+						return;
+					}
+					
+					// For other cases, check if this is an app hotkey
 					if (matchesHotkey(e, appHotkeys)) {
 						e.preventDefault(); // Prevent default browser behavior
 						console.log('App hotkey captured:', e.key);

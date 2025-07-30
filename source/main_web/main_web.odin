@@ -52,3 +52,9 @@ web_window_size_changed :: proc "c" (w: c.int, h: c.int) {
 	context = web_context
 	game.game_parent_window_size_changed(int(w), int(h))
 }
+
+@(export)
+web_is_text_input_focused :: proc "c" () -> c.int {
+	context = web_context
+	return c.int(game.g.focus == .Search)
+}

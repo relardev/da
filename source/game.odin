@@ -495,6 +495,11 @@ game_parent_window_size_changed :: proc(w, h: int) {
 	rl.SetWindowSize(i32(w), i32(h))
 }
 
+// Helper function to check if text input is focused
+is_text_input_focused :: proc() -> bool {
+	return g.focus == .Search
+}
+
 observe_debug :: proc(msg: cstring) {
 	if g.debug_show {
 		append(&g.debug_observe, msg)
