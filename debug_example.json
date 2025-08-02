@@ -40,18 +40,9 @@
         "source_attr_type": "VALUE",
         "target_path": "deviceType"
       }
-    },
-    "writeDeviceType": {
-      "type": "L_SET",
-      "args": {
-        "writer_id": "profile_writer",
-        "source_path": "deviceType",
-        "target_path": "standard.deviceType"
-      }
     }
   },
   "edges": {
-    "_start": ["readDeviceType"],
-    "readDeviceType": ["writeDeviceType"]
+    "_start": ["readDeviceType"]
   }
 }

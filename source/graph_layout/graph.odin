@@ -8,18 +8,18 @@ import "core:slice"
 gutter_edge_distance :: 10.0 // distance between edges in gutters
 gutter_padding :: 40.0 // padding around gutters
 
-GRAPH_X_ALGORITHM :: "barycenter" // "naive", "barycenter"
+GRAPH_X_ALGORITHM :: "naive" // "naive", "barycenter"
 
 V2 :: [2]f32
 V2i :: [2]i32
 
 Graph :: struct {
+	allocator:          mem.Allocator,
 	nodes:              hm.Handle_Map(Node, NodeHandle, 1024),
 	edges:              hm.Handle_Map(Edge, EdgeHandle, 1024),
 	gutters_vertical:   [dynamic]Gutter,
 	gutters_horizontal: [dynamic]Gutter,
 	node_size:          V2,
-	allocator:          mem.Allocator,
 }
 
 NodeHandle :: hm.Handle
@@ -183,7 +183,7 @@ graph_read_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> (Edg
 	return {}, false // edge not found
 }
 
-graph_calculate_layout :: proc(graph: ^Graph) {
+graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2) {
 	sorter: ts.Sorter(NodeHandle)
 	context.allocator = graph.allocator
 
@@ -336,14 +336,14 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 			gutter.pos = previous_width
 			previous_width += gutter.size_px + graph.node_size.x
 		}
-		graph.node_size.x = previous_width
 
 		previous_height: f32 = 0
 		for &gutter in graph.gutters_horizontal {
 			gutter.pos = previous_height
 			previous_height += gutter.size_px + graph.node_size.y
 		}
-		graph.node_size.y = previous_height
+
+		graph_size = {previous_width, previous_height}
 	}
 
 	// Fill node positions
@@ -417,6 +417,8 @@ graph_calculate_layout :: proc(graph: ^Graph) {
 			}
 		}
 	}
+
+	return graph_size
 }
 
 graph_predecessors_of :: proc(graph: ^Graph, node: NodeHandle) -> []NodeHandle {

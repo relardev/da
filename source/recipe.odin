@@ -169,7 +169,6 @@ recipe_create_from_pasted :: proc() {
 
 	fill_node_sizes()
 
-
 	// Calculate node and edge positions 
 	{
 		gl_graph := gl.graph_new(allocator = g.recipe_allocator)
