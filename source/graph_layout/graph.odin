@@ -2,7 +2,6 @@ package graph_layout
 
 import hm "../handle_map"
 import ts "core:container/topological_sort"
-import "core:fmt"
 import "core:mem"
 import "core:slice"
 
@@ -81,7 +80,6 @@ destroy_graph :: proc(graph: ^Graph) {
 }
 
 graph_add_node :: proc(graph: ^Graph, external_id: ExternalID, size: V2) {
-	fmt.println(external_id)
 	hm.add(&graph.nodes, Node{external_id = external_id})
 	if graph.node_size.x < size.x {
 		graph.node_size.x = size.x
@@ -93,7 +91,6 @@ graph_add_node :: proc(graph: ^Graph, external_id: ExternalID, size: V2) {
 }
 
 graph_add_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> bool {
-	fmt.println(from, to)
 	// find from handle
 	from_handle: NodeHandle
 	FIND_FROM: {
