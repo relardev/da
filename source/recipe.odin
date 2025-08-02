@@ -5,7 +5,10 @@ import "core:fmt"
 import "core:log"
 import "core:math/rand"
 import "core:mem"
+import gl "graph_layout"
 import hm "handle_map"
+
+RANDOM_SEED :: 0x123456789abcdef0
 
 clipboard_after_paste :: proc() {
 	recipe_create_from_pasted()
@@ -165,7 +168,44 @@ recipe_create_from_pasted :: proc() {
 	}
 
 	fill_node_sizes()
-	graph_calculate_layout(&g.graph)
+
+
+	// Calculate node and edge positions 
+	{
+		gl_graph := gl.graph_new(allocator = g.recipe_allocator)
+
+		node_iter := hm.make_iter(&g.graph.nodes)
+		for node in hm.iter(&node_iter) {
+			gl.graph_add_node(&gl_graph, gl.id(node.handle), node.size_px)
+		}
+
+		edge_iter := hm.make_iter(&g.graph.edges)
+		for edge in hm.iter(&edge_iter) {
+			ok := gl.graph_add_edge(&gl_graph, gl.id(edge.from), gl.id(edge.to))
+			assert(ok, "Failed to add edge")
+		}
+
+		gl.graph_calculate_layout(&gl_graph)
+
+		node_iter = hm.make_iter(&g.graph.nodes)
+		for node in hm.iter(&node_iter) {
+			position_px, ok := gl.graph_read_node(&gl_graph, gl.id(node.handle))
+			assert(ok, "Failed to read node position")
+			node.position_px = position_px
+		}
+
+		edge_iter = hm.make_iter(&g.graph.edges)
+		for edge in hm.iter(&edge_iter) {
+			result, ok := gl.graph_read_edge(&gl_graph, gl.id(edge.from), gl.id(edge.to))
+			assert(ok, "Failed to read edge to position")
+			edge.segments = result.segments
+			edge.arrow_direction = result.arrow_direction
+		}
+
+		//debug stuff
+		g.graph.gutters_vertical = gl_graph.gutters_vertical[:]
+		g.graph.gutters_horizontal = gl_graph.gutters_horizontal[:]
+	}
 }
 
 Recipe :: struct {

@@ -230,7 +230,7 @@ update :: proc() {
 	if is_pointer_over_editor {
 		// MOUSE IN GRAPH
 		clay.SetCurrentContext(g.clay_graph_context)
-		clay.SetLayoutDimensions({g.graph.size_px.x + 200, 9999999})
+		clay.SetLayoutDimensions({9999999, 9999999})
 		// if rl.IsKeyPressed(.D) {
 		// 	g.clay_graph_debug_mode = !g.clay_graph_debug_mode
 		// 	clay.SetDebugModeEnabled(g.clay_graph_debug_mode)
@@ -438,7 +438,6 @@ game_shutdown :: proc() {
 	free(g.clay_node_memory)
 	delete(g.raylib_fonts)
 	mem.dynamic_arena_destroy(&g.recipe_arena)
-	graph_close(&g.graph)
 	free(g)
 }
 

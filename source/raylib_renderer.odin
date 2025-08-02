@@ -5,6 +5,7 @@ import "core:fmt"
 // import "core:log"
 import "core:math"
 import "core:strings"
+import gl "graph_layout"
 import hm "handle_map"
 import rl "vendor:raylib"
 
@@ -309,7 +310,7 @@ draw_edge :: proc(edge: ^Edge, canvas_start: Vec2, color: rl.Color) {
 	draw_arrow(edge.segments[last + 1] + canvas_start, edge.arrow_direction, color)
 }
 
-draw_arrow :: proc(pos: Vec2, direction: ArrowDirection, color: rl.Color) {
+draw_arrow :: proc(pos: Vec2, direction: gl.ArrowDirection, color: rl.Color) {
 	// Draw an arrow at the given position, pointing in the specified direction
 	// The arrow is drawn as a triangle with a base of 20 pixels and a height of 10 pixels
 	arrow_base: f32 = 20.0
