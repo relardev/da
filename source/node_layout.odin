@@ -3,7 +3,7 @@ package game
 import clay "clay-odin"
 import hm "handle_map"
 
-fill_node_sizes :: proc() {
+fill_node_sizes :: proc() -> Vec2 {
 	clya_node_min_memory_size := clay.MinMemorySize()
 	clay_node_arena := clay.CreateArenaWithCapacityAndMemory(
 		uint(clya_node_min_memory_size),
@@ -36,12 +36,20 @@ fill_node_sizes :: proc() {
 	}
 	commands := clay.EndLayout()
 
+	max_size_px: Vec2
 	for i in 0 ..< commands.length {
 		command := clay.RenderCommandArray_Get(&commands, i)
 		if command.commandType == .Custom {
 			handle := cast(^NodeHandle)command.renderData.custom.customData
 			node := hm.get(&g.graph.nodes, handle^)
 			node.size_px = {command.boundingBox.width, command.boundingBox.height}
+			if node.size_px.x > max_size_px.x {
+				max_size_px.x = node.size_px.x
+			}
+			if node.size_px.y > max_size_px.y {
+				max_size_px.y = node.size_px.y
+			}
 		}
 	}
+	return max_size_px
 }

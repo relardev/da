@@ -167,7 +167,7 @@ recipe_create_from_pasted :: proc() {
 		}
 	}
 
-	fill_node_sizes()
+	max_node_size := fill_node_sizes()
 
 	// Calculate node and edge positions 
 	{
@@ -175,6 +175,7 @@ recipe_create_from_pasted :: proc() {
 
 		node_iter := hm.make_iter(&g.graph.nodes)
 		for node in hm.iter(&node_iter) {
+			node.size_px = max_node_size
 			gl.graph_add_node(&gl_graph, gl.id(node.handle), node.size_px)
 		}
 
