@@ -15,19 +15,18 @@ V2i :: [2]i32
 
 Graph :: struct {
 	allocator:          mem.Allocator,
-	nodes:              hm.Handle_Map(Node, NodeHandle, 1024),
+	nodes:              [dynamic]Node,
 	edges:              hm.Handle_Map(Edge, EdgeHandle, 1024),
 	gutters_vertical:   [dynamic]Gutter,
 	gutters_horizontal: [dynamic]Gutter,
 	node_size:          V2,
 }
 
-NodeHandle :: hm.Handle
+NodeOffset :: int
 
 ExternalID :: u64
 
 Node :: struct {
-	handle:      NodeHandle,
 	external_id: ExternalID,
 	position:    V2i,
 	position_px: V2,
@@ -43,8 +42,8 @@ ArrowDirection :: enum {
 
 Edge :: struct {
 	handle:          EdgeHandle,
-	from:            NodeHandle,
-	to:              NodeHandle,
+	from:            NodeOffset,
+	to:              NodeOffset,
 	segments:        [5]V2,
 	arrow_direction: ArrowDirection,
 }
@@ -56,7 +55,7 @@ Gutter :: struct {
 }
 
 graph_new :: proc(allocator := context.allocator) -> Graph {
-	return Graph{allocator = allocator}
+	return Graph{allocator = allocator, nodes = make([dynamic]Node, 0, 1024)}
 }
 
 graph_free :: proc(graph: ^Graph) {
@@ -80,7 +79,8 @@ destroy_graph :: proc(graph: ^Graph) {
 }
 
 graph_add_node :: proc(graph: ^Graph, external_id: ExternalID, size: V2) {
-	hm.add(&graph.nodes, Node{external_id = external_id})
+	append(&graph.nodes, Node{external_id = external_id})
+
 	if graph.node_size.x < size.x {
 		graph.node_size.x = size.x
 	}
@@ -91,13 +91,12 @@ graph_add_node :: proc(graph: ^Graph, external_id: ExternalID, size: V2) {
 }
 
 graph_add_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> bool {
-	// find from handle
-	from_handle: NodeHandle
+	// find from offset
+	from_handle: NodeOffset
 	FIND_FROM: {
-		node_iter := hm.make_iter(&graph.nodes)
-		for node in hm.iter(&node_iter) {
+		for node, i in graph.nodes {
 			if node.external_id == from {
-				from_handle = node.handle
+				from_handle = i
 				break FIND_FROM
 			}
 		}
@@ -107,12 +106,11 @@ graph_add_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> bool 
 
 
 	// find to handle
-	to_handle: NodeHandle
+	to_handle: NodeOffset
 	FIND_TO: {
-		node_iter := hm.make_iter(&graph.nodes)
-		for node in hm.iter(&node_iter) {
+		for node, i in graph.nodes {
 			if node.external_id == to {
-				to_handle = node.handle
+				to_handle = i
 				break FIND_TO
 			}
 		}
@@ -129,8 +127,7 @@ graph_add_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> bool 
 }
 
 graph_read_node :: proc(graph: ^Graph, external_id: ExternalID) -> (V2, bool) {
-	node_iter := hm.make_iter(&graph.nodes)
-	for node in hm.iter(&node_iter) {
+	for node in graph.nodes {
 		if node.external_id == external_id {
 			return node.position_px, true
 		}
@@ -145,12 +142,11 @@ EdgeResult :: struct {
 
 graph_read_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> (EdgeResult, bool) {
 	// find from handle
-	from_handle: NodeHandle
+	from_handle: NodeOffset
 	FIND_FROM: {
-		node_iter := hm.make_iter(&graph.nodes)
-		for node in hm.iter(&node_iter) {
+		for node, i in graph.nodes {
 			if node.external_id == from {
-				from_handle = node.handle
+				from_handle = i
 				break FIND_FROM
 			}
 		}
@@ -159,12 +155,11 @@ graph_read_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> (Edg
 	}
 
 	// find to handle
-	to_handle: NodeHandle
+	to_handle: NodeOffset
 	FIND_TO: {
-		node_iter := hm.make_iter(&graph.nodes)
-		for node in hm.iter(&node_iter) {
+		for node, i in graph.nodes {
 			if node.external_id == to {
-				to_handle = node.handle
+				to_handle = i
 				break FIND_TO
 			}
 		}
@@ -184,16 +179,15 @@ graph_read_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> (Edg
 }
 
 graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2) {
-	sorter: ts.Sorter(NodeHandle)
+	sorter: ts.Sorter(NodeOffset)
 	context.allocator = graph.allocator
 
 	ts.init(&sorter)
 	defer ts.destroy(&sorter)
 
-	node_iter := hm.make_iter(&graph.nodes)
-	for node in hm.iter(&node_iter) {
+	for _, i in graph.nodes {
 		// log.info("Adding node to sorter: ", node.handle, " - ", node.name)
-		ok := ts.add_key(&sorter, node.handle)
+		ok := ts.add_key(&sorter, i)
 		assert(ok, "Failed to add node to sorter")
 	}
 
@@ -208,19 +202,19 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2) {
 
 	assert(len(cycled) == 0, "Graph contains cycles")
 
-	layers := make([dynamic][dynamic]NodeHandle, hm.num_used(graph.nodes))
+	layers := make([dynamic][dynamic]NodeOffset, len(graph.nodes))
 
 	y_max: i32 = 0
 	for node_handle in nodes_sorted {
 		max_prev: i32 = 0
 		for pre_node_handle in graph_predecessors_of(graph, node_handle) {
-			pred_node := hm.get(&graph.nodes, pre_node_handle)
+			pred_node := graph.nodes[pre_node_handle]
 			if pred_node.position.y + 1 > max_prev {
 				max_prev = pred_node.position.y + 1
 			}
 		}
 
-		node := hm.get(&graph.nodes, node_handle)
+		node := &graph.nodes[node_handle]
 		node.position.y = max_prev
 		if max_prev > y_max {
 			y_max = max_prev
@@ -236,8 +230,8 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2) {
 	// even with resetting random generator seed
 	{
 		for layer in layers {
-			slice.sort_by(layer[:], proc(a, b: NodeHandle) -> bool {
-				return a.idx < b.idx
+			slice.sort_by(layer[:], proc(a, b: NodeOffset) -> bool {
+				return a < b
 			})
 		}
 	}
@@ -251,7 +245,7 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2) {
 			}
 			// fmt.println("Layer: ", layer)
 			for node_handle, i in layer {
-				node := hm.get(&graph.nodes, node_handle)
+				node := &graph.nodes[node_handle]
 				node.position.x = i32(i)
 			}
 		}
@@ -270,8 +264,7 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2) {
 	}
 
 	x_max: i32 = 0
-	node_iter = hm.make_iter(&graph.nodes)
-	for node in hm.iter(&node_iter) {
+	for node in graph.nodes {
 		if node.position.x > x_max {
 			x_max = node.position.x
 		}
@@ -284,8 +277,8 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2) {
 	{
 		edges_iter := hm.make_iter(&graph.edges)
 		for edge in hm.iter(&edges_iter) {
-			from_node := hm.get(&graph.nodes, edge.from)
-			to_node := hm.get(&graph.nodes, edge.to)
+			from_node := graph.nodes[edge.from]
+			to_node := graph.nodes[edge.to]
 
 			if from_node.position.y + 1 == to_node.position.y &&
 			   from_node.position.x == to_node.position.x {
@@ -347,8 +340,7 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2) {
 	}
 
 	// Fill node positions
-	node_iter = hm.make_iter(&graph.nodes)
-	for node in hm.iter(&node_iter) {
+	for &node in graph.nodes {
 		node.position_px = graph_get_node_position_px(graph, node.position)
 	}
 
@@ -358,8 +350,8 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2) {
 	{
 		edges_iter := hm.make_iter(&graph.edges)
 		for edge in hm.iter(&edges_iter) {
-			from_node := hm.get(&graph.nodes, edge.from)
-			to_node := hm.get(&graph.nodes, edge.to)
+			from_node := graph.nodes[edge.from]
+			to_node := graph.nodes[edge.to]
 
 			// middle of from_node
 			edge.segments[0] = from_node.position_px + 0.5 * graph.node_size
@@ -421,28 +413,27 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2) {
 	return graph_size
 }
 
-graph_predecessors_of :: proc(graph: ^Graph, node: NodeHandle) -> []NodeHandle {
+graph_predecessors_of :: proc(graph: ^Graph, offset: NodeOffset) -> []NodeOffset {
 	edges_iter := hm.make_iter(&graph.edges)
-	preds := make([dynamic]NodeHandle, 0, 16)
+	preds := make([dynamic]NodeOffset, 0, 16)
 	for edge in hm.iter(&edges_iter) {
-		if edge.to == node {
+		if edge.to == offset {
 			append(&preds, edge.from)
 		}
 	}
 	return preds[:]
 }
 
-graph_unwind_crossings :: proc(graph: ^Graph, layer: []NodeHandle, descending: bool) {
+graph_unwind_crossings :: proc(graph: ^Graph, layer: []NodeOffset, descending: bool) {
 	center_struct :: struct {
-		handle: NodeHandle,
+		handle: NodeOffset,
 		center: f32,
 		pos:    f32,
 	}
 	centers := make([]center_struct, len(layer))
 
-	loop := proc(graph: ^Graph, node_handle: NodeHandle, idx: int, centers: []center_struct) {
-		node := hm.get(&graph.nodes, node_handle)
-		center := graph_calculate_nodes_barycenter(graph, node)
+	loop := proc(graph: ^Graph, node_handle: NodeOffset, idx: int, centers: []center_struct) {
+		center := graph_calculate_nodes_barycenter(graph, node_handle)
 		centers[idx] = center_struct {
 			handle = node_handle,
 			center = center,
@@ -488,7 +479,7 @@ graph_unwind_crossings :: proc(graph: ^Graph, layer: []NodeHandle, descending: b
 		},
 	)
 	for center, i in centers {
-		node := hm.get(&graph.nodes, center.handle)
+		node := graph.nodes[center.handle]
 		node.position.x = i32(i)
 	}
 }
@@ -535,11 +526,11 @@ graph_vertical_lane_for_edge :: proc(graph: ^Graph, gutter: ^Gutter, edge: ^Edge
 	panic("Edge not found in gutter")
 }
 
-graph_calculate_nodes_barycenter :: proc(graph: ^Graph, node: ^Node) -> f32 {
+graph_calculate_nodes_barycenter :: proc(graph: ^Graph, offset: NodeOffset) -> f32 {
 	sum: f32 = 0
-	preds := graph_predecessors_of(graph, node.handle)
+	preds := graph_predecessors_of(graph, offset)
 	for pred in preds {
-		pred_node := hm.get(&graph.nodes, pred)
+		pred_node := graph.nodes[pred]
 		sum += f32(pred_node.position.x)
 	}
 
