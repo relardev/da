@@ -171,6 +171,7 @@ recipe_create_from_pasted :: proc() {
 
 	// Calculate node and edge positions 
 	{
+		fmt.println(gl.allocation_needed(10, 20))
 		gl_graph := gl.graph_new(allocator = g.recipe_allocator)
 
 		node_iter := hm.make_iter(&g.graph.nodes)
@@ -185,7 +186,8 @@ recipe_create_from_pasted :: proc() {
 			assert(ok, "Failed to add edge")
 		}
 
-		gl.graph_calculate_layout(&gl_graph)
+		_, ok_layout := gl.graph_calculate_layout(&gl_graph)
+		assert(ok_layout, "Failed to calculate layout")
 
 		node_iter = hm.make_iter(&g.graph.nodes)
 		for node in hm.iter(&node_iter) {
