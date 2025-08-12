@@ -11,6 +11,8 @@ import textedit "core:text/edit"
 import hm "handle_map"
 import rl "vendor:raylib"
 
+debug_example := #load("../debug_example.json")
+
 ZOOM_SPEED: f32 = 0.1
 MIN_ZOOM: f32 = 0.1
 MAX_ZOOM: f32 = 10
@@ -120,6 +122,13 @@ update :: proc() {
 			if rl.IsKeyPressed(.V) && is_ctrl_down {
 				g.needs_redraw = true
 				clipboard_paste()
+			}
+
+			if rl.IsKeyPressed(.F8) {
+				g.needs_redraw = true
+				mem.copy(&g.pasted[0], raw_data(debug_example), len(debug_example))
+				g.pasted_len = i32(len(debug_example))
+				clipboard_after_paste()
 			}
 
 			if rl.IsKeyPressed(.N) {

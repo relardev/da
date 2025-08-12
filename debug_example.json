@@ -18,18 +18,6 @@
       ]
     }
   },
-  "readers": {
-    "event_reader": {
-      "type": "EVENT",
-      "args": {}
-    }
-  },
-  "writers": {
-    "profile_writer": {
-      "type": "PROFILE",
-      "args": {}
-    }
-  },
   "nodes": {
     "readDeviceType": {
       "type": "E_READER",
@@ -41,8 +29,15 @@
         "target_path": "deviceType"
       }
     }
+    "next": {
+      "type": "E_NEXT",
+      "args": {
+        "next_scenario": "Device Model scenario"
+      }
+    }
   },
   "edges": {
-    "_start": ["readDeviceType"]
+    "_start": ["readDeviceType"],
+    "readDeviceType": ["next"]
   }
 }

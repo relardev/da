@@ -171,34 +171,39 @@ recipe_create_from_pasted :: proc() {
 
 	// Calculate node and edge positions 
 	{
-		fmt.println(gl.allocation_needed(10, 20))
-		gl_graph := gl.graph_new(allocator = g.recipe_allocator)
+		nodes := hm.num_used(g.graph.nodes) - 1 // exclude the zero node
+		edges := hm.num_used(g.graph.edges) - 1 // exclude the zero edge
+
+		buffer_size := gl.allocation_needed(nodes, edges)
+		buffer := make([]u8, buffer_size, allocator = g.recipe_allocator)
+		assert(buffer != nil, "Failed to allocate buffer for graph layout")
+		gl_graph := gl.graph_new(buffer, nodes, edges)
 
 		node_iter := hm.make_iter(&g.graph.nodes)
 		for node in hm.iter(&node_iter) {
 			node.size_px = max_node_size
-			gl.graph_add_node(&gl_graph, gl.id(node.handle), node.size_px)
+			gl.graph_add_node(gl_graph, gl.id(node.handle), node.size_px)
 		}
 
 		edge_iter := hm.make_iter(&g.graph.edges)
 		for edge in hm.iter(&edge_iter) {
-			ok := gl.graph_add_edge(&gl_graph, gl.id(edge.from), gl.id(edge.to))
+			ok := gl.graph_add_edge(gl_graph, gl.id(edge.from), gl.id(edge.to))
 			assert(ok, "Failed to add edge")
 		}
 
-		_, ok_layout := gl.graph_calculate_layout(&gl_graph)
+		_, ok_layout := gl.graph_calculate_layout(gl_graph)
 		assert(ok_layout, "Failed to calculate layout")
 
 		node_iter = hm.make_iter(&g.graph.nodes)
 		for node in hm.iter(&node_iter) {
-			position_px, ok := gl.graph_read_node(&gl_graph, gl.id(node.handle))
+			position_px, ok := gl.graph_read_node(gl_graph, gl.id(node.handle))
 			assert(ok, "Failed to read node position")
 			node.position_px = position_px
 		}
 
 		edge_iter = hm.make_iter(&g.graph.edges)
 		for edge in hm.iter(&edge_iter) {
-			result, ok := gl.graph_read_edge(&gl_graph, gl.id(edge.from), gl.id(edge.to))
+			result, ok := gl.graph_read_edge(gl_graph, gl.id(edge.from), gl.id(edge.to))
 			assert(ok, "Failed to read edge to position")
 			edge.segments = result.segments
 			edge.arrow_direction = result.arrow_direction

@@ -1,9 +1,10 @@
 package graph_layout
 
 import "base:runtime"
-import ts "core:container/topological_sort"
+import "core:log"
 import "core:mem"
 import "core:slice"
+import ts "topological_sort"
 
 gutter_edge_distance :: 10.0 // distance between edges in gutters
 gutter_padding :: 40.0 // padding around gutters
@@ -14,6 +15,7 @@ V2 :: [2]f32
 V2i :: [2]i32
 
 Graph :: struct {
+	arena:              mem.Arena,
 	allocator:          mem.Allocator,
 	nodes:              [dynamic]Node,
 	edges:              [dynamic]Edge,
@@ -27,9 +29,10 @@ NodeOffset :: int
 ExternalID :: u64
 
 Node :: struct {
-	external_id: ExternalID,
-	position:    V2i,
-	position_px: V2,
+	external_id:     ExternalID,
+	position:        V2i,
+	position_px:     V2,
+	number_of_edges: int,
 }
 
 EdgeOffset :: int
@@ -56,89 +59,112 @@ Gutter :: struct {
 Layers :: [dynamic][dynamic]NodeOffset
 
 allocation_needed :: proc(nodes: int, edges: int) -> int {
+	when ODIN_DEBUG {
+		add_memory :: proc(sum, new_mem: int, name: string) -> int {
+			log.infof("%d\t%d\t%s", sum, new_mem, name)
+			return sum + new_mem
+		}
+	} else {
+		add_memory :: proc(sum, new_mem: int, name: string) -> int {
+			return sum + new_mem
+		}
+	}
+
 	sum := 0
 
 	// base structures
 	{
-		sum += size_of(Graph)
-		sum += size_of(Node) * nodes
-		sum += size_of(Edge) * edges
+		sum = add_memory(sum, size_of(Graph), "Graph")
+		sum = add_memory(sum, size_of(Node) * nodes, "Nodes")
+		sum = add_memory(sum, size_of(Edge) * edges, "Edges")
 
-		gutter_edge_elements_size := size_of(EdgeOffset) * edges
-
-		// each edge will be in at most 1 horizontal and 1 vertical gutter
-		sum += 2 * size_of(Gutter) * nodes + gutter_edge_elements_size
 	}
 
 	// topological sort
 	{
 		// topological sort data structures
-		single_edge_relations_dependents_size := runtime.map_total_allocation_size(
-			1,
-			runtime.map_info(map[NodeOffset]struct {}),
+		// sum = add_memory(sum, size_of(ts.Sorter(NodeOffset)), "ts, sorter")
+
+		sum = add_memory(
+			sum,
+			int(
+				runtime.map_total_allocation_size(
+					uintptr(nodes),
+					runtime.map_info(map[NodeOffset]ts.Relations(NodeOffset)),
+				),
+			),
+			"ts, map for nodes",
 		)
 
-		all_edges_in_relations_dependents_size := runtime.map_total_allocation_size(
-			uintptr(edges),
-			runtime.map_info(map[EdgeOffset]struct {}),
+		sum = add_memory(
+			sum,
+			int(runtime.map_total_allocation_size(1, runtime.map_info(map[NodeOffset]bool))) *
+			edges,
+			"ts, maps for edges, size 1",
 		)
 
-		relations_map_size := runtime.map_total_allocation_size(
-			uintptr(nodes),
-			runtime.map_info(map[NodeOffset]ts.Relations(NodeOffset)),
+		sum = add_memory(
+			sum,
+			int(
+				runtime.map_total_allocation_size(
+					uintptr(edges),
+					runtime.map_info(map[EdgeOffset]bool),
+				),
+			),
+			"ts, maps for edges, size edges",
 		)
 
-		sum +=
-			int(single_edge_relations_dependents_size + all_edges_in_relations_dependents_size) +
-			int(relations_map_size) +
-			size_of(ts.Sorter(NodeOffset))
-
-		// sorting result
-		sum += nodes * size_of(NodeOffset)
+		sum = add_memory(sum, nodes * size_of(NodeOffset), "ts, result, sorted nodes")
 	}
 
 	// layers
 	{
 		// outer dynamic array - holding all rows (data ptr + len + cap)
-		sum += size_of(Layers)
+		sum = add_memory(sum, size_of(Layers), "Layers, outer dynamic array")
+
 		// outer dynamic array elements - rows
-		sum += size_of([dynamic]NodeOffset) * nodes
+		sum = add_memory(sum, size_of([dynamic]NodeOffset) * nodes, "Layers, rows offsets")
+
 		// inner dynamic array - rows values
-		sum += size_of(NodeOffset) * nodes
+		sum = add_memory(sum, size_of(NodeOffset) * nodes, "Layers, rows values")
 	}
 
-	// predecessors
-	sum += size_of([dynamic]NodeOffset) * nodes
+	sum = add_memory(sum, size_of([dynamic]NodeOffset) * nodes, "Predecessors")
+
+	gutter_edge_elements_size := size_of(EdgeOffset) * edges
+	vertical_or_horizontal_gutter_size := size_of(Gutter) * (nodes + 2)
+	// each edge will be in at most 1 horizontal and 1 vertical gutter
+	sum = add_memory(
+		sum,
+		vertical_or_horizontal_gutter_size + gutter_edge_elements_size,
+		"Gutters Vertical",
+	)
+	sum = add_memory(
+		sum,
+		vertical_or_horizontal_gutter_size + gutter_edge_elements_size,
+		"Gutters Horizontal",
+	)
 
 	return sum
 }
 
-graph_new :: proc(allocator := context.allocator) -> Graph {
-	return Graph {
-		allocator = allocator,
-		nodes = make([dynamic]Node, 0, 1024, allocator = allocator),
-		edges = make([dynamic]Edge, 0, 1024, allocator = allocator),
-	}
-}
+graph_new :: proc(buffer: []u8, nodes: int, edges: int) -> ^Graph {
+	graph := cast(^Graph)raw_data(buffer)
+	size_of_graph := size_of(Graph)
+	rest_of_buffer := buffer[size_of_graph:]
 
-graph_free :: proc(graph: ^Graph) {
-	for gutter in graph.gutters_vertical {
-		delete(gutter.edges)
-	}
-	delete(graph.gutters_vertical)
+	mem.arena_init(&graph.arena, rest_of_buffer)
+	graph.allocator = mem.arena_allocator(&graph.arena)
 
-	for gutter in graph.gutters_horizontal {
-		delete(gutter.edges)
-	}
-	delete(graph.gutters_horizontal)
-}
+	graph.nodes = make([dynamic]Node, 0, nodes, allocator = graph.allocator)
+	graph.nodes.allocator = mem.panic_allocator()
+	graph.edges = make([dynamic]Edge, 0, edges, allocator = graph.allocator)
+	graph.edges.allocator = mem.panic_allocator()
 
-destroy_graph :: proc(graph: ^Graph) {
-	if graph == nil {
-		return
-	}
-
-	free(graph)
+	mark_memory_used(graph, graph, "Graph")
+	mark_memory_used(graph, raw_data(graph.nodes), "Nodes")
+	mark_memory_used(graph, raw_data(graph.edges), "Edges")
+	return graph
 }
 
 graph_add_node :: proc(graph: ^Graph, external_id: ExternalID, size: V2) {
@@ -160,13 +186,13 @@ graph_add_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> bool 
 		for &node, i in graph.nodes {
 			if node.external_id == from {
 				from_offset = i
+				node.number_of_edges += 1
 				break FIND_FROM
 			}
 		}
 
 		return false
 	}
-
 
 	// find to offset
 	to_offset: NodeOffset
@@ -244,15 +270,18 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 	sorter: ts.Sorter(NodeOffset)
 	context.allocator = graph.allocator
 
-	ts.init(&sorter)
-	defer ts.destroy(&sorter)
+	ts.init(&sorter, len(graph.nodes))
 
-	for _, i in graph.nodes {
+	sorter.relations.allocator = mem.panic_allocator()
+	mark_memory_used(
+		graph,
+		rawptr(runtime.map_data(transmute(runtime.Raw_Map)sorter.relations)),
+		"ts, relations map",
+	)
+
+	for node, i in graph.nodes {
 		// log.info("Adding node to sorter: ", node.offset, " - ", node.name)
-		ok = ts.add_key(&sorter, i)
-		if !ok {
-			return {}, false
-		}
+		ts.add_key(&sorter, i, node.number_of_edges)
 	}
 
 	for &edge in graph.edges {
@@ -263,16 +292,19 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 		}
 	}
 
-	nodes_sorted, cycled := ts.sort(&sorter)
+	nodes_sorted, cycled := ts.sort(&sorter, result_allocator = graph.allocator)
 
-	if len(cycled) != 0 {
+	mark_memory_used(graph, raw_data(nodes_sorted), "ts, result, sorted nodes")
+
+	if cycled {
 		return {}, false
 	}
 
-	layers := make(Layers, len(graph.nodes))
+	layers := make(Layers, len(graph.nodes), allocator = graph.allocator)
 
 	y_max: i32 = 0
 	predecessor_list := make([dynamic]NodeOffset, 0, len(graph.nodes), allocator = graph.allocator)
+	mark_memory_used(graph, raw_data(predecessor_list), "Predecessors")
 	for node_offset in nodes_sorted {
 		max_prev: i32 = 0
 		graph_fill_predecessors_of(graph, node_offset, &predecessor_list)
@@ -328,8 +360,10 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 		}
 	}
 
-	graph.gutters_vertical = make([dynamic]Gutter, x_max + 2)
-	graph.gutters_horizontal = make([dynamic]Gutter, y_max + 2)
+	graph.gutters_vertical = make([dynamic]Gutter, x_max + 2, allocator = graph.allocator)
+	mark_memory_used(graph, raw_data(graph.gutters_vertical), "Gutters, vertical")
+	graph.gutters_horizontal = make([dynamic]Gutter, y_max + 2, allocator = graph.allocator)
+	mark_memory_used(graph, raw_data(graph.gutters_horizontal), "Gutters, horizontal")
 
 	// Calculate gutters sizes
 	{
@@ -469,6 +503,7 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 	return graph_size, true
 }
 
+@(private = "file")
 graph_fill_predecessors_of :: proc(
 	graph: ^Graph,
 	offset: NodeOffset,
@@ -482,6 +517,7 @@ graph_fill_predecessors_of :: proc(
 	}
 }
 
+@(private = "file")
 graph_get_node_position_px :: proc(graph: ^Graph, node_pos: V2i) -> V2 {
 	// Width:
 	width: f32 = 0.0
@@ -504,6 +540,7 @@ graph_get_node_position_px :: proc(graph: ^Graph, node_pos: V2i) -> V2 {
 	return {width, height}
 }
 
+@(private = "file")
 graph_horizontal_lane_for_edge :: proc(
 	graph: ^Graph,
 	gutter: ^Gutter,
@@ -518,6 +555,7 @@ graph_horizontal_lane_for_edge :: proc(
 	panic("Edge not found in gutter")
 }
 
+@(private = "file")
 graph_vertical_lane_for_edge :: proc(
 	graph: ^Graph,
 	gutter: ^Gutter,
@@ -534,4 +572,11 @@ graph_vertical_lane_for_edge :: proc(
 
 id :: proc(external_id: $T) -> ExternalID {
 	return transmute(ExternalID)external_id
+}
+
+@(private = "file")
+mark_memory_used :: proc(graph: ^Graph, object_start: rawptr, name: string) {
+	when ODIN_DEBUG {
+		log.infof("%d - %s", uintptr(object_start) - uintptr(graph), name)
+	}
 }

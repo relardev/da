@@ -4,11 +4,11 @@ For making a release exe that does not use hot reload.
 
 package main_release
 
+import game ".."
 import "core:log"
+import "core:mem"
 import "core:os"
 import "core:path/filepath"
-import "core:mem"
-import game ".."
 
 _ :: mem
 
@@ -19,7 +19,7 @@ main :: proc() {
 	exe_path := os.args[0]
 	exe_dir := filepath.dir(string(exe_path), context.temp_allocator)
 	os.set_current_directory(exe_dir)
-	
+
 	mode: int = 0
 	when ODIN_OS == .Linux || ODIN_OS == .Darwin {
 		mode = os.S_IRUSR | os.S_IWUSR | os.S_IRGRP | os.S_IROTH
@@ -33,7 +33,8 @@ main :: proc() {
 	}
 
 	logger_alloc := context.allocator
-	logger := logh_err == os.ERROR_NONE ? log.create_file_logger(logh, allocator = logger_alloc) : log.create_console_logger(allocator = logger_alloc)
+	logger :=
+		logh_err == os.ERROR_NONE ? log.create_file_logger(logh, allocator = logger_alloc) : log.create_console_logger(allocator = logger_alloc)
 	context.logger = logger
 
 	when USE_TRACKING_ALLOCATOR {
@@ -74,3 +75,4 @@ NvOptimusEnablement: u32 = 1
 
 @(export)
 AmdPowerXpressRequestHighPerformance: i32 = 1
+
