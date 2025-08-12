@@ -1,6 +1,7 @@
 package graph_layout
 
 import "base:runtime"
+import "core:fmt"
 import "core:log"
 import "core:mem"
 import "core:slice"
@@ -24,7 +25,8 @@ Graph :: struct {
 	node_size:          V2,
 }
 
-NodeOffset :: int
+NodeOffset :: u16
+EdgeOffset :: u16
 
 ExternalID :: u64
 
@@ -32,12 +34,10 @@ Node :: struct {
 	external_id:     ExternalID,
 	position:        V2i,
 	position_px:     V2,
-	number_of_edges: int,
+	number_of_edges: u16,
 }
 
-EdgeOffset :: int
-
-ArrowDirection :: enum {
+ArrowDirection :: enum u8 {
 	Down,
 	Left,
 	Right,
@@ -75,8 +75,8 @@ allocation_needed :: proc(nodes: int, edges: int) -> int {
 	// base structures
 	{
 		sum = add_memory(sum, size_of(Graph), "Graph")
-		sum = add_memory(sum, size_of(Node) * nodes, "Nodes")
-		sum = add_memory(sum, size_of(Edge) * edges, "Edges")
+		sum = add_memory(sum, size_of(Node) * nodes, fmt.tprintf("Nodes: %d", nodes))
+		sum = add_memory(sum, size_of(Edge) * edges, fmt.tprintf("Edges: %d", edges))
 
 	}
 
@@ -119,9 +119,6 @@ allocation_needed :: proc(nodes: int, edges: int) -> int {
 
 	// layers
 	{
-		// outer dynamic array - holding all rows (data ptr + len + cap)
-		sum = add_memory(sum, size_of(Layers), "Layers, outer dynamic array")
-
 		// outer dynamic array elements - rows
 		sum = add_memory(sum, size_of([dynamic]NodeOffset) * nodes, "Layers, rows offsets")
 
@@ -185,7 +182,7 @@ graph_add_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> bool 
 	FIND_FROM: {
 		for &node, i in graph.nodes {
 			if node.external_id == from {
-				from_offset = i
+				from_offset = NodeOffset(i)
 				node.number_of_edges += 1
 				break FIND_FROM
 			}
@@ -199,7 +196,7 @@ graph_add_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> bool 
 	FIND_TO: {
 		for &node, i in graph.nodes {
 			if node.external_id == to {
-				to_offset = i
+				to_offset = NodeOffset(i)
 				break FIND_TO
 			}
 		}
@@ -235,7 +232,7 @@ graph_read_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> (Edg
 	FIND_FROM: {
 		for &node, i in graph.nodes {
 			if node.external_id == from {
-				from_offset = i
+				from_offset = NodeOffset(i)
 				break FIND_FROM
 			}
 		}
@@ -248,7 +245,7 @@ graph_read_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> (Edg
 	FIND_TO: {
 		for &node, i in graph.nodes {
 			if node.external_id == to {
-				to_offset = i
+				to_offset = NodeOffset(i)
 				break FIND_TO
 			}
 		}
@@ -281,7 +278,7 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 
 	for node, i in graph.nodes {
 		// log.info("Adding node to sorter: ", node.offset, " - ", node.name)
-		ts.add_key(&sorter, i, node.number_of_edges)
+		ts.add_key(&sorter, NodeOffset(i), int(node.number_of_edges))
 	}
 
 	for &edge in graph.edges {
@@ -380,7 +377,7 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 			{
 				horizontal := from_node.position.y + 1
 				horizontal_edges := &graph.gutters_horizontal[horizontal].edges
-				append(horizontal_edges, i)
+				append(horizontal_edges, EdgeOffset(i))
 			}
 
 			// Vertical
@@ -400,7 +397,7 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 				}
 
 				vertical_edges := &graph.gutters_vertical[vertical_gutter_idx].edges
-				append(vertical_edges, i)
+				append(vertical_edges, EdgeOffset(i))
 			}
 		}
 
