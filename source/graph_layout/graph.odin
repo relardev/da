@@ -17,6 +17,7 @@ V2i :: [2]i32
 
 Graph :: struct {
 	arena:              mem.Arena,
+	arena_allocator:    mem.Allocator,
 	allocator:          mem.Allocator,
 	nodes:              [dynamic]Node,
 	edges:              [dynamic]Edge,
@@ -44,8 +45,8 @@ ArrowDirection :: enum u8 {
 }
 
 Edge :: struct {
-	from:            NodeOffset,
-	to:              NodeOffset,
+	from:            NodeOffset, // 2 bytes
+	to:              NodeOffset, // 2 bytes
 	segments:        [5]V2,
 	arrow_direction: ArrowDirection,
 }
@@ -60,8 +61,8 @@ Layers :: [dynamic][dynamic]NodeOffset
 
 allocation_needed :: proc(nodes: int, edges: int) -> int {
 	when ODIN_DEBUG {
-		add_memory :: proc(sum, new_mem: int, name: string) -> int {
-			log.infof("%d\t%d\t%s", sum, new_mem, name)
+		add_memory :: proc(sum, new_mem: int, name: string, loc := #caller_location) -> int {
+			log.infof("%d\t%d\t%s", sum, new_mem, name, location = loc)
 			return sum + new_mem
 		}
 	} else {
@@ -82,23 +83,20 @@ allocation_needed :: proc(nodes: int, edges: int) -> int {
 
 	// topological sort
 	{
-		// topological sort data structures
-		// sum = add_memory(sum, size_of(ts.Sorter(NodeOffset)), "ts, sorter")
-
 		sum = add_memory(
 			sum,
 			int(
 				runtime.map_total_allocation_size(
-					uintptr(nodes),
+					uintptr(max(nodes, 8)),
 					runtime.map_info(map[NodeOffset]ts.Relations(NodeOffset)),
 				),
 			),
-			"ts, map for nodes",
+			"ts, relations map",
 		)
 
 		sum = add_memory(
 			sum,
-			int(runtime.map_total_allocation_size(1, runtime.map_info(map[NodeOffset]bool))) *
+			int(runtime.map_total_allocation_size(8, runtime.map_info(map[NodeOffset]bool))) *
 			edges,
 			"ts, maps for edges, size 1",
 		)
@@ -107,7 +105,7 @@ allocation_needed :: proc(nodes: int, edges: int) -> int {
 			sum,
 			int(
 				runtime.map_total_allocation_size(
-					uintptr(edges),
+					uintptr(max(edges, 8)),
 					runtime.map_info(map[EdgeOffset]bool),
 				),
 			),
@@ -151,7 +149,12 @@ graph_new :: proc(buffer: []u8, nodes: int, edges: int) -> ^Graph {
 	rest_of_buffer := buffer[size_of_graph:]
 
 	mem.arena_init(&graph.arena, rest_of_buffer)
-	graph.allocator = mem.arena_allocator(&graph.arena)
+	graph.arena_allocator = mem.arena_allocator(&graph.arena)
+	when ODIN_DEBUG {
+		graph.allocator = print_allocator(&graph.arena_allocator)
+	} else {
+		graph.allocator = graph.arena_allocator
+	}
 
 	graph.nodes = make([dynamic]Node, 0, nodes, allocator = graph.allocator)
 	graph.nodes.allocator = mem.panic_allocator()
@@ -572,8 +575,13 @@ id :: proc(external_id: $T) -> ExternalID {
 }
 
 @(private = "file")
-mark_memory_used :: proc(graph: ^Graph, object_start: rawptr, name: string) {
+mark_memory_used :: proc(
+	graph: ^Graph,
+	object_start: rawptr,
+	name: string,
+	loc := #caller_location,
+) {
 	when ODIN_DEBUG {
-		log.infof("%d - %s", uintptr(object_start) - uintptr(graph), name)
+		log.infof("%d - %s", uintptr(object_start) - uintptr(graph), name, location = loc)
 	}
 }

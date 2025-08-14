@@ -1,0 +1,36 @@
+{
+  "name": "Device Model scenario",
+  "type": "Dot",
+  "enabled": true,
+  "partner_id": "__all__",
+  "trigger": {
+    "type": "EVENT",
+    "args": {
+      "match_conditions": [
+        {
+          "key": "$.client.deviceatlas.primaryHardwareType"
+        },
+        {
+          "key": "$.stat.pos",
+          "operator": "equals",
+          "value": "T"
+        }
+      ]
+    }
+  },
+  "nodes": {
+    "readDeviceType": {
+      "type": "E_READER",
+      "args": {
+        "reader_id": "event_reader",
+        "source_path": "$.client.deviceatlas.primaryHardwareType",
+        "source_type": "STRING",
+        "source_attr_type": "VALUE",
+        "target_path": "deviceType"
+      }
+    }
+  },
+  "edges": {
+    "_start": ["readDeviceType"],
+  }
+}

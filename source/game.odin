@@ -11,7 +11,9 @@ import textedit "core:text/edit"
 import hm "handle_map"
 import rl "vendor:raylib"
 
-debug_example := #load("../debug_example.json")
+node1 := #load("../examples/1node.json")
+node3 := #load("../examples/3node.json")
+big_example := #load("../examples/big.json")
 
 ZOOM_SPEED: f32 = 0.1
 MIN_ZOOM: f32 = 0.1
@@ -126,8 +128,22 @@ update :: proc() {
 
 			if rl.IsKeyPressed(.F8) {
 				g.needs_redraw = true
-				mem.copy(&g.pasted[0], raw_data(debug_example), len(debug_example))
-				g.pasted_len = i32(len(debug_example))
+				mem.copy(&g.pasted[0], raw_data(node1), len(node1))
+				g.pasted_len = i32(len(node1))
+				clipboard_after_paste()
+			}
+
+			if rl.IsKeyPressed(.F9) {
+				g.needs_redraw = true
+				mem.copy(&g.pasted[0], raw_data(node3), len(node3))
+				g.pasted_len = i32(len(node3))
+				clipboard_after_paste()
+			}
+
+			if rl.IsKeyPressed(.F10) {
+				g.needs_redraw = true
+				mem.copy(&g.pasted[0], raw_data(big_example), len(big_example))
+				g.pasted_len = i32(len(big_example))
 				clipboard_after_paste()
 			}
 
