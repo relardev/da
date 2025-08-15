@@ -11,9 +11,10 @@ import textedit "core:text/edit"
 import hm "handle_map"
 import rl "vendor:raylib"
 
-node1 := #load("../examples/1node.json")
-node3 := #load("../examples/3node.json")
-big_example := #load("../examples/big.json")
+example_node1 := #load("../examples/1node.json")
+example_node3 := #load("../examples/3node.json")
+example_big := #load("../examples/big.json")
+example_last_purchase := #load("../examples/product_purchase.json")
 
 ZOOM_SPEED: f32 = 0.1
 MIN_ZOOM: f32 = 0.1
@@ -128,22 +129,29 @@ update :: proc() {
 
 			if rl.IsKeyPressed(.F8) {
 				g.needs_redraw = true
-				mem.copy(&g.pasted[0], raw_data(node1), len(node1))
-				g.pasted_len = i32(len(node1))
+				mem.copy(&g.pasted[0], raw_data(example_node1), len(example_node1))
+				g.pasted_len = i32(len(example_node1))
 				clipboard_after_paste()
 			}
 
 			if rl.IsKeyPressed(.F9) {
 				g.needs_redraw = true
-				mem.copy(&g.pasted[0], raw_data(node3), len(node3))
-				g.pasted_len = i32(len(node3))
+				mem.copy(&g.pasted[0], raw_data(example_node3), len(example_node3))
+				g.pasted_len = i32(len(example_node3))
 				clipboard_after_paste()
 			}
 
 			if rl.IsKeyPressed(.F10) {
 				g.needs_redraw = true
-				mem.copy(&g.pasted[0], raw_data(big_example), len(big_example))
-				g.pasted_len = i32(len(big_example))
+				mem.copy(&g.pasted[0], raw_data(example_big), len(example_big))
+				g.pasted_len = i32(len(example_big))
+				clipboard_after_paste()
+			}
+
+			if rl.IsKeyPressed(.F11) {
+				g.needs_redraw = true
+				mem.copy(&g.pasted[0], raw_data(example_last_purchase), len(example_last_purchase))
+				g.pasted_len = i32(len(example_last_purchase))
 				clipboard_after_paste()
 			}
 

@@ -7,6 +7,8 @@ import "core:mem"
 import "core:slice"
 import ts "topological_sort"
 
+_ :: log
+
 gutter_edge_distance :: 10.0 // distance between edges in gutters
 gutter_padding :: 40.0 // padding around gutters
 
@@ -212,6 +214,7 @@ allocation_needed :: proc(nodes: int, edges: int) -> (size: int, alginment: int)
 
 graph_new :: proc(buffer: []u8, nodes: int, edges: int) -> ^Graph {
 	graph := cast(^Graph)raw_data(buffer)
+	mark_memory_used(graph, graph, "Graph")
 	size_of_graph := size_of(Graph)
 	rest_of_buffer := buffer[size_of_graph:]
 
@@ -225,12 +228,12 @@ graph_new :: proc(buffer: []u8, nodes: int, edges: int) -> ^Graph {
 
 	graph.nodes = make([dynamic]Node, 0, nodes, allocator = graph.allocator)
 	graph.nodes.allocator = mem.panic_allocator()
+	mark_memory_used(graph, raw_data(graph.nodes), "Nodes")
+
 	graph.edges = make([dynamic]Edge, 0, edges, allocator = graph.allocator)
 	graph.edges.allocator = mem.panic_allocator()
-
-	mark_memory_used(graph, graph, "Graph")
-	mark_memory_used(graph, raw_data(graph.nodes), "Nodes")
 	mark_memory_used(graph, raw_data(graph.edges), "Edges")
+
 	return graph
 }
 

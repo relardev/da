@@ -21,7 +21,11 @@ init :: proc(
 	allocator := context.allocator,
 	loc := #caller_location,
 ) {
-	sorter.relations = make(map[K]Relations(K), number_of_nodes, allocator = allocator)
+	sorter.relations = make(
+		map[K]Relations(K),
+		(4 * number_of_nodes + 2) / 3, // cause map resizing treshold is 75% of capacity
+		allocator = allocator,
+	)
 	sorter.dependents_allocator = allocator
 }
 
