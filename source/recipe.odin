@@ -1,5 +1,6 @@
 package game
 
+import "base:runtime"
 import "core:encoding/json"
 import "core:fmt"
 import "core:log"
@@ -174,8 +175,13 @@ recipe_create_from_pasted :: proc() {
 		nodes := hm.num_used(g.graph.nodes) - 1 // exclude the zero node
 		edges := hm.num_used(g.graph.edges) - 1 // exclude the zero edge
 
-		buffer_size := gl.allocation_needed(nodes, edges)
-		buffer := make([]u8, buffer_size, allocator = g.recipe_allocator)
+		buffer_size, alignment := gl.allocation_needed(nodes, edges)
+		buffer := runtime.make_aligned(
+			[]u8,
+			buffer_size,
+			alignment,
+			allocator = g.recipe_allocator,
+		)
 		assert(buffer != nil, "Failed to allocate buffer for graph layout")
 		gl_graph := gl.graph_new(buffer, nodes, edges)
 

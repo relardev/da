@@ -59,15 +59,37 @@ Gutter :: struct {
 
 Layers :: [dynamic][dynamic]NodeOffset
 
-allocation_needed :: proc(nodes: int, edges: int) -> int {
-	when ODIN_DEBUG {
-		add_memory :: proc(sum, new_mem: int, name: string, loc := #caller_location) -> int {
-			log.infof("%d\t%d\t%s", sum, new_mem, name, location = loc)
+allocation_needed :: proc(nodes: int, edges: int) -> (size: int, alginment: int) {
+	calculate_memory :: proc(sum, new_mem, align: int) -> int {
+		reminder := sum % align
+		if reminder == 0 {
 			return sum + new_mem
 		}
+		padding := align - (sum % align)
+		return sum + padding + new_mem
+	}
+
+	when ODIN_DEBUG {
+		add_memory :: proc(
+			sum, new_mem, align: int,
+			name: string,
+			loc := #caller_location,
+		) -> int {
+			result := calculate_memory(sum, new_mem, align)
+			log.infof(
+				"%d\t%d\t%d\t%d\t%s",
+				sum,
+				result - new_mem,
+				new_mem,
+				align,
+				name,
+				location = loc,
+			)
+			return result
+		}
 	} else {
-		add_memory :: proc(sum, new_mem: int, name: string) -> int {
-			return sum + new_mem
+		add_memory :: proc(sum, new_mem, align: int, _: string) -> int {
+			return calculate_memory(sum, new_mem, align)
 		}
 	}
 
@@ -75,9 +97,19 @@ allocation_needed :: proc(nodes: int, edges: int) -> int {
 
 	// base structures
 	{
-		sum = add_memory(sum, size_of(Graph), "Graph")
-		sum = add_memory(sum, size_of(Node) * nodes, fmt.tprintf("Nodes: %d", nodes))
-		sum = add_memory(sum, size_of(Edge) * edges, fmt.tprintf("Edges: %d", edges))
+		sum = add_memory(sum, size_of(Graph), align_of(Graph), "Graph")
+		sum = add_memory(
+			sum,
+			size_of(Node) * nodes,
+			align_of(Node),
+			fmt.tprintf("Nodes: %d", nodes),
+		)
+		sum = add_memory(
+			sum,
+			size_of(Edge) * edges,
+			align_of(Edge),
+			fmt.tprintf("Edges: %d", edges),
+		)
 
 	}
 
@@ -91,6 +123,7 @@ allocation_needed :: proc(nodes: int, edges: int) -> int {
 					runtime.map_info(map[NodeOffset]ts.Relations(NodeOffset)),
 				),
 			),
+			64,
 			"ts, relations map",
 		)
 
@@ -98,6 +131,7 @@ allocation_needed :: proc(nodes: int, edges: int) -> int {
 			sum,
 			int(runtime.map_total_allocation_size(8, runtime.map_info(map[NodeOffset]bool))) *
 			edges,
+			64,
 			"ts, maps for edges, size 1",
 		)
 
@@ -109,38 +143,71 @@ allocation_needed :: proc(nodes: int, edges: int) -> int {
 					runtime.map_info(map[EdgeOffset]bool),
 				),
 			),
+			64,
 			"ts, maps for edges, size edges",
 		)
 
-		sum = add_memory(sum, nodes * size_of(NodeOffset), "ts, result, sorted nodes")
+		sum = add_memory(
+			sum,
+			nodes * size_of(NodeOffset),
+			align_of(NodeOffset),
+			"ts, result, sorted nodes",
+		)
 	}
 
 	// layers
 	{
 		// outer dynamic array elements - rows
-		sum = add_memory(sum, size_of([dynamic]NodeOffset) * nodes, "Layers, rows offsets")
+		sum = add_memory(
+			sum,
+			size_of([dynamic]NodeOffset) * nodes,
+			align_of([dynamic]NodeOffset),
+			"Layers, rows offsets",
+		)
 
 		// inner dynamic array - rows values
-		sum = add_memory(sum, size_of(NodeOffset) * nodes, "Layers, rows values")
+		sum = add_memory(
+			sum,
+			size_of(NodeOffset) * nodes,
+			align_of(NodeOffset),
+			"Layers, rows values",
+		)
 	}
 
-	sum = add_memory(sum, size_of([dynamic]NodeOffset) * nodes, "Predecessors")
+	sum = add_memory(
+		sum,
+		size_of([dynamic]NodeOffset) * nodes,
+		align_of([dynamic]NodeOffset),
+		"Predecessors",
+	)
 
 	gutter_edge_elements_size := size_of(EdgeOffset) * edges
 	vertical_or_horizontal_gutter_size := size_of(Gutter) * (nodes + 2)
 	// each edge will be in at most 1 horizontal and 1 vertical gutter
+	sum = add_memory(sum, vertical_or_horizontal_gutter_size, align_of(Gutter), "Gutters Vertical")
+
 	sum = add_memory(
 		sum,
-		vertical_or_horizontal_gutter_size + gutter_edge_elements_size,
-		"Gutters Vertical",
+		gutter_edge_elements_size,
+		align_of(EdgeOffset),
+		"Gutters Vertical Edges",
 	)
+
 	sum = add_memory(
 		sum,
 		vertical_or_horizontal_gutter_size + gutter_edge_elements_size,
+		align_of(Gutter),
 		"Gutters Horizontal",
 	)
 
-	return sum
+	sum = add_memory(
+		sum,
+		gutter_edge_elements_size,
+		align_of(EdgeOffset),
+		"Gutters Horizontal Edges",
+	)
+
+	return sum, 64
 }
 
 graph_new :: proc(buffer: []u8, nodes: int, edges: int) -> ^Graph {
