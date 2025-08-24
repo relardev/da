@@ -12,7 +12,8 @@ _ :: log
 gutter_edge_distance :: 10.0 // distance between edges in gutters
 gutter_padding :: 40.0 // padding around gutters
 
-GRAPH_X_ALGORITHM :: "naive" // "naive"
+// GRAPH_X_ALGORITHM :: "naive"
+GRAPH_X_ALGORITHM :: "barycenter"
 
 V2 :: [2]f32
 V2i :: [2]i32
@@ -37,6 +38,7 @@ Node :: struct {
 	external_id:     ExternalID,
 	position:        V2i,
 	position_px:     V2,
+	barycenter_x:    f32,
 	number_of_edges: u16,
 }
 
@@ -59,10 +61,16 @@ Gutter :: struct {
 	size_px: f32,
 }
 
-Layers :: [dynamic][dynamic]NodeOffset
+LayerCell :: struct {
+	node_offset: NodeOffset,
+	x:           f32,
+}
+
+Layers :: [dynamic][dynamic]LayerCell
 
 allocation_needed :: proc(nodes: int, edges: int) -> (size: int, alginment: int) {
 	calculate_memory :: proc(sum, new_mem, align: int) -> int {
+		// TODO use mem.align_forward_int
 		reminder := sum % align
 		if reminder == 0 {
 			return sum + new_mem
@@ -102,7 +110,7 @@ allocation_needed :: proc(nodes: int, edges: int) -> (size: int, alginment: int)
 		sum = add_memory(sum, size_of(Graph), align_of(Graph), "Graph")
 		sum = add_memory(
 			sum,
-			size_of(Node) * nodes,
+			size_of(Node) * (nodes + 1), // +1 for the no-node offset
 			align_of(Node),
 			fmt.tprintf("Nodes: %d", nodes),
 		)
@@ -162,16 +170,16 @@ allocation_needed :: proc(nodes: int, edges: int) -> (size: int, alginment: int)
 		// outer dynamic array elements - rows
 		sum = add_memory(
 			sum,
-			size_of([dynamic]NodeOffset) * nodes,
-			align_of([dynamic]NodeOffset),
+			size_of([dynamic]LayerCell) * nodes,
+			align_of([dynamic]LayerCell),
 			"Layers, rows offsets",
 		)
 
 		// inner dynamic array - rows values
 		sum = add_memory(
 			sum,
-			size_of(NodeOffset) * nodes,
-			align_of(NodeOffset),
+			size_of(LayerCell) * nodes,
+			align_of(LayerCell),
 			"Layers, rows values",
 		)
 	}
@@ -182,6 +190,20 @@ allocation_needed :: proc(nodes: int, edges: int) -> (size: int, alginment: int)
 		align_of([dynamic]NodeOffset),
 		"Predecessors",
 	)
+
+	// X algorithm
+	{
+		switch GRAPH_X_ALGORITHM {
+		case "naive":
+		// nothing to do, no additional memory needed
+		case "barycenter":
+			// predecessors list for each node
+			bytes, align := optimal_assign_quadratic_allocation_needed(nodes)
+			sum = add_memory(sum, bytes, align, "optimal_assign_quadratic")
+		case:
+			panic("Unknown GRAPH_X_ALGORITHM: " + GRAPH_X_ALGORITHM)
+		}
+	}
 
 	gutter_edge_elements_size := size_of(EdgeOffset) * edges
 	vertical_or_horizontal_gutter_size := size_of(Gutter) * (nodes + 2)
@@ -226,7 +248,9 @@ graph_new :: proc(buffer: []u8, nodes: int, edges: int) -> ^Graph {
 		graph.allocator = graph.arena_allocator
 	}
 
-	graph.nodes = make([dynamic]Node, 0, nodes, allocator = graph.allocator)
+	graph.nodes = make([dynamic]Node, 0, nodes + 1, allocator = graph.allocator)
+	append(&graph.nodes, Node{})
+
 	graph.nodes.allocator = mem.panic_allocator()
 	mark_memory_used(graph, raw_data(graph.nodes), "Nodes")
 
@@ -254,6 +278,9 @@ graph_add_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> bool 
 	from_offset: NodeOffset
 	FIND_FROM: {
 		for &node, i in graph.nodes {
+			if i == 0 {
+				continue
+			}
 			if node.external_id == from {
 				from_offset = NodeOffset(i)
 				node.number_of_edges += 1
@@ -268,6 +295,9 @@ graph_add_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> bool 
 	to_offset: NodeOffset
 	FIND_TO: {
 		for &node, i in graph.nodes {
+			if i == 0 {
+				continue
+			}
 			if node.external_id == to {
 				to_offset = NodeOffset(i)
 				break FIND_TO
@@ -286,7 +316,7 @@ graph_add_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> bool 
 }
 
 graph_read_node :: proc(graph: ^Graph, external_id: ExternalID) -> (V2, bool) {
-	for &node in graph.nodes {
+	for &node in graph.nodes[1:] {
 		if node.external_id == external_id {
 			return node.position_px, true
 		}
@@ -304,6 +334,9 @@ graph_read_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> (Edg
 	from_offset: NodeOffset
 	FIND_FROM: {
 		for &node, i in graph.nodes {
+			if i == 0 {
+				continue
+			}
 			if node.external_id == from {
 				from_offset = NodeOffset(i)
 				break FIND_FROM
@@ -317,6 +350,9 @@ graph_read_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> (Edg
 	to_offset: NodeOffset
 	FIND_TO: {
 		for &node, i in graph.nodes {
+			if i == 0 {
+				continue
+			}
 			if node.external_id == to {
 				to_offset = NodeOffset(i)
 				break FIND_TO
@@ -340,7 +376,9 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 	sorter: ts.Sorter(NodeOffset)
 	context.allocator = graph.allocator
 
-	ts.init(&sorter, len(graph.nodes))
+	nodes_count := len(graph.nodes) - 1
+
+	ts.init(&sorter, nodes_count)
 
 	sorter.relations.allocator = mem.panic_allocator()
 	mark_memory_used(
@@ -350,6 +388,9 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 	)
 
 	for node, i in graph.nodes {
+		if i == 0 {
+			continue
+		}
 		// log.info("Adding node to sorter: ", node.offset, " - ", node.name)
 		ts.add_key(&sorter, NodeOffset(i), int(node.number_of_edges))
 	}
@@ -370,10 +411,10 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 		return {}, false
 	}
 
-	layers := make(Layers, len(graph.nodes), allocator = graph.allocator)
+	layers := make(Layers, nodes_count, allocator = graph.allocator)
 
 	y_max: i32 = 0
-	predecessor_list := make([dynamic]NodeOffset, 0, len(graph.nodes), allocator = graph.allocator)
+	predecessor_list := make([dynamic]NodeOffset, 0, nodes_count, allocator = graph.allocator)
 	mark_memory_used(graph, raw_data(predecessor_list), "Predecessors")
 	for node_offset in nodes_sorted {
 		max_prev: i32 = 0
@@ -392,8 +433,10 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 		}
 
 		layer := layers[node.position.y]
-		append(&layer, node_offset)
+		x := f32(len(layer))
+		append(&layer, LayerCell{node_offset = node_offset, x = x})
 		layers[node.position.y] = layer
+		node.barycenter_x = x
 	}
 
 	// Sort layers so that calculation is stable,
@@ -401,26 +444,81 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 	// even with resetting random generator seed
 	{
 		for layer in layers {
-			slice.sort_by(layer[:], proc(a, b: NodeOffset) -> bool {
-				return a < b
+			slice.sort_by(layer[:], proc(a, b: LayerCell) -> bool {
+				return a.node_offset < b.node_offset
 			})
 		}
 	}
 
+	for &layer in layers {
+		non_zero_resize(&layer, cap(layer))
+	}
+
+
 	// Fill x positions
-	if GRAPH_X_ALGORITHM == "naive" {
-		for layer in layers {
-			if len(layer) == 0 {
-				continue // skip empty layers
-			}
-			// fmt.println("Layer: ", layer)
-			for node_offset, i in layer {
-				node := &graph.nodes[node_offset]
-				node.position.x = i32(i)
+	switch GRAPH_X_ALGORITHM {
+	case "naive":
+	// do nothing, the x positions will be filled with layer append order
+	case "barycenter":
+		for i in 0 ..< 2 {
+			direction := i % 2
+			fmt.println("Barycenter iteration: ", i, ", direction: ", direction)
+			LAYERING: for layer in layers {
+				if len(layer) == 0 {
+					break LAYERING
+				}
+				for &cell in layer {
+					if direction == 0 {
+						graph_fill_predecessors_of(graph, cell.node_offset, &predecessor_list)
+					} else {
+						graph_fill_children_of(graph, cell.node_offset, &predecessor_list)
+					}
+
+					sum: f32 = 0
+					for pred in predecessor_list {
+						sum += f32(graph.nodes[pred].barycenter_x)
+					}
+					cell.x = sum / f32(len(predecessor_list))
+					node := &graph.nodes[cell.node_offset]
+					node.barycenter_x = cell.x
+				}
+
+				slice.sort_by(
+					layer[:],
+					proc(a, b: LayerCell) -> bool {
+						if a.x == b.x {
+							return a.node_offset < b.node_offset // stable sort
+						}
+						return a.x < b.x
+					},
+				)
+
+				arena_usage := graph.arena.offset
+				optimal_assign_quadratic(layer[:], allocator = graph.allocator)
+				graph.arena.offset = arena_usage
+
+				for &cell, j in layer {
+					node := &graph.nodes[cell.node_offset]
+					node.barycenter_x = f32(j)
+				}
 			}
 		}
-	} else {
+	case:
 		panic("Unknown GRAPH_X_ALGORITHM: " + GRAPH_X_ALGORITHM)
+	}
+
+	for layer in layers {
+		if len(layer) == 0 {
+			continue // skip empty layers
+		}
+		// fmt.println("Layer: ", layer)
+		for cell, i in layer {
+			if cell.node_offset == 0 {
+				continue
+			}
+			node := &graph.nodes[cell.node_offset]
+			node.position.x = i32(i)
+		}
 	}
 
 	x_max: i32 = 0
@@ -501,7 +599,7 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 	}
 
 	// Fill node positions
-	for &node in graph.nodes {
+	for &node in graph.nodes[1:] {
 		node.position_px = graph_get_node_position_px(graph, node.position)
 	}
 
@@ -577,12 +675,22 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 graph_fill_predecessors_of :: proc(
 	graph: ^Graph,
 	offset: NodeOffset,
-	preds: ^[dynamic]NodeOffset,
+	result: ^[dynamic]NodeOffset,
 ) {
-	clear(preds)
+	clear(result)
 	for &edge in graph.edges {
 		if edge.to == offset {
-			append(preds, edge.from)
+			append(result, edge.from)
+		}
+	}
+}
+
+@(private = "file")
+graph_fill_children_of :: proc(graph: ^Graph, offset: NodeOffset, result: ^[dynamic]NodeOffset) {
+	clear(result)
+	for &edge in graph.edges {
+		if edge.from == offset {
+			append(result, edge.to)
 		}
 	}
 }

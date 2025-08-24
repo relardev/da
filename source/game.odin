@@ -430,7 +430,12 @@ game_init :: proc() {
 		on_hover_context = context,
 	}
 
-	mem.dynamic_arena_init(&g.recipe_arena, alignment = recipe_arena_align)
+	mem.dynamic_arena_init(
+		&g.recipe_arena,
+		block_size = 8 * mem.Megabyte,
+		alignment = recipe_arena_align,
+	)
+
 	g.recipe_allocator = mem.dynamic_arena_allocator(&g.recipe_arena)
 
 	g.recipe = new(Recipe, allocator = g.recipe_allocator)
