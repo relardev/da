@@ -68,7 +68,13 @@ LayerCell :: struct {
 
 Layers :: [dynamic][dynamic]LayerCell
 
-allocation_needed :: proc(nodes: int, edges: int) -> (size: int, alginment: int) {
+allocation_needed :: proc(
+	nodes: int,
+	edges: int,
+) -> (
+	size: int,
+	alginment: int,
+) {
 	calculate_memory :: proc(sum, new_mem, align: int) -> int {
 		// TODO use mem.align_forward_int
 		reminder := sum % align
@@ -139,7 +145,12 @@ allocation_needed :: proc(nodes: int, edges: int) -> (size: int, alginment: int)
 
 		sum = add_memory(
 			sum,
-			int(runtime.map_total_allocation_size(8, runtime.map_info(map[NodeOffset]bool))) *
+			int(
+				runtime.map_total_allocation_size(
+					8,
+					runtime.map_info(map[NodeOffset]bool),
+				),
+			) *
 			edges,
 			64,
 			"ts, maps for edges, size 1",
@@ -208,7 +219,12 @@ allocation_needed :: proc(nodes: int, edges: int) -> (size: int, alginment: int)
 	gutter_edge_elements_size := size_of(EdgeOffset) * edges
 	vertical_or_horizontal_gutter_size := size_of(Gutter) * (nodes + 2)
 	// each edge will be in at most 1 horizontal and 1 vertical gutter
-	sum = add_memory(sum, vertical_or_horizontal_gutter_size, align_of(Gutter), "Gutters Vertical")
+	sum = add_memory(
+		sum,
+		vertical_or_horizontal_gutter_size,
+		align_of(Gutter),
+		"Gutters Vertical",
+	)
 
 	sum = add_memory(
 		sum,
@@ -244,11 +260,17 @@ graph_new :: proc(buffer: []u8, nodes: int, edges: int) -> ^Graph {
 	graph.arena_allocator = mem.arena_allocator(&graph.arena)
 	when ODIN_DEBUG {
 		graph.allocator = print_allocator(&graph.arena_allocator)
+		// graph.allocator = graph.arena_allocator
 	} else {
 		graph.allocator = graph.arena_allocator
 	}
 
-	graph.nodes = make([dynamic]Node, 0, nodes + 1, allocator = graph.allocator)
+	graph.nodes = make(
+		[dynamic]Node,
+		0,
+		nodes + 1,
+		allocator = graph.allocator,
+	)
 	append(&graph.nodes, Node{})
 
 	graph.nodes.allocator = mem.panic_allocator()
@@ -273,7 +295,11 @@ graph_add_node :: proc(graph: ^Graph, external_id: ExternalID, size: V2) {
 	}
 }
 
-graph_add_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> bool {
+graph_add_edge :: proc(
+	graph: ^Graph,
+	from: ExternalID,
+	to: ExternalID,
+) -> bool {
 	// find from offset
 	from_offset: NodeOffset
 	FIND_FROM: {
@@ -329,7 +355,14 @@ EdgeResult :: struct {
 	arrow_direction: ArrowDirection,
 }
 
-graph_read_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> (EdgeResult, bool) {
+graph_read_edge :: proc(
+	graph: ^Graph,
+	from: ExternalID,
+	to: ExternalID,
+) -> (
+	EdgeResult,
+	bool,
+) {
 	// find from offset
 	from_offset: NodeOffset
 	FIND_FROM: {
@@ -364,7 +397,10 @@ graph_read_edge :: proc(graph: ^Graph, from: ExternalID, to: ExternalID) -> (Edg
 
 	for &edge in graph.edges {
 		if edge.from == from_offset && edge.to == to_offset {
-			return EdgeResult{segments = edge.segments[:], arrow_direction = edge.arrow_direction},
+			return EdgeResult {
+					segments = edge.segments[:],
+					arrow_direction = edge.arrow_direction,
+				},
 				true
 		}
 	}
@@ -403,7 +439,10 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 		}
 	}
 
-	nodes_sorted, cycled := ts.sort(&sorter, result_allocator = graph.allocator)
+	nodes_sorted, cycled := ts.sort(
+		&sorter,
+		result_allocator = graph.allocator,
+	)
 
 	mark_memory_used(graph, raw_data(nodes_sorted), "ts, result, sorted nodes")
 
@@ -414,7 +453,12 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 	layers := make(Layers, nodes_count, allocator = graph.allocator)
 
 	y_max: i32 = 0
-	predecessor_list := make([dynamic]NodeOffset, 0, nodes_count, allocator = graph.allocator)
+	predecessor_list := make(
+		[dynamic]NodeOffset,
+		0,
+		nodes_count,
+		allocator = graph.allocator,
+	)
 	mark_memory_used(graph, raw_data(predecessor_list), "Predecessors")
 	for node_offset in nodes_sorted {
 		max_prev: i32 = 0
@@ -451,9 +495,15 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 	}
 
 	for &layer in layers {
+		endOffset := len(layer)
 		non_zero_resize(&layer, cap(layer))
+		for &cell in layer[endOffset:] {
+			cell.x = -1
+		}
 	}
 
+
+	// fmt.println("Layers after initial pass:", layers)
 
 	// Fill x positions
 	switch GRAPH_X_ALGORITHM {
@@ -462,25 +512,44 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 	case "barycenter":
 		for i in 0 ..< 2 {
 			direction := i % 2
-			fmt.println("Barycenter iteration: ", i, ", direction: ", direction)
+			// fmt.println(
+			// 	"Barycenter iteration: ",
+			// 	i,
+			// 	", direction: ",
+			// 	direction,
+			// )
 			LAYERING: for layer in layers {
 				if len(layer) == 0 {
 					break LAYERING
 				}
 				for &cell in layer {
+					if cell.node_offset == 0 {
+						continue
+					}
 					if direction == 0 {
-						graph_fill_predecessors_of(graph, cell.node_offset, &predecessor_list)
+						graph_fill_predecessors_of(
+							graph,
+							cell.node_offset,
+							&predecessor_list,
+						)
 					} else {
-						graph_fill_children_of(graph, cell.node_offset, &predecessor_list)
+						graph_fill_children_of(
+							graph,
+							cell.node_offset,
+							&predecessor_list,
+						)
 					}
 
 					sum: f32 = 0
 					for pred in predecessor_list {
 						sum += f32(graph.nodes[pred].barycenter_x)
 					}
-					cell.x = sum / f32(len(predecessor_list))
 					node := &graph.nodes[cell.node_offset]
-					node.barycenter_x = cell.x
+
+					if len(predecessor_list) != 0 {
+						cell.x = sum / f32(len(predecessor_list))
+						node.barycenter_x = cell.x
+					}
 				}
 
 				slice.sort_by(
@@ -495,6 +564,7 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 
 				arena_usage := graph.arena.offset
 				optimal_assign_quadratic(layer[:], allocator = graph.allocator)
+
 				graph.arena.offset = arena_usage
 
 				for &cell, j in layer {
@@ -528,10 +598,26 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 		}
 	}
 
-	graph.gutters_vertical = make([dynamic]Gutter, x_max + 2, allocator = graph.allocator)
-	mark_memory_used(graph, raw_data(graph.gutters_vertical), "Gutters, vertical")
-	graph.gutters_horizontal = make([dynamic]Gutter, y_max + 2, allocator = graph.allocator)
-	mark_memory_used(graph, raw_data(graph.gutters_horizontal), "Gutters, horizontal")
+	graph.gutters_vertical = make(
+		[dynamic]Gutter,
+		x_max + 2,
+		allocator = graph.allocator,
+	)
+	mark_memory_used(
+		graph,
+		raw_data(graph.gutters_vertical),
+		"Gutters, vertical",
+	)
+	graph.gutters_horizontal = make(
+		[dynamic]Gutter,
+		y_max + 2,
+		allocator = graph.allocator,
+	)
+	mark_memory_used(
+		graph,
+		raw_data(graph.gutters_horizontal),
+		"Gutters, horizontal",
+	)
 
 	// Calculate gutters sizes
 	{
@@ -573,11 +659,15 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 		}
 
 		for &gutter in graph.gutters_vertical {
-			gutter.size_px = 2 * gutter_padding + gutter_edge_distance * f32(len(gutter.edges))
+			gutter.size_px =
+				2 * gutter_padding +
+				gutter_edge_distance * f32(len(gutter.edges))
 		}
 
 		for &gutter in graph.gutters_horizontal {
-			gutter.size_px = 2 * gutter_padding + gutter_edge_distance * f32(len(gutter.edges))
+			gutter.size_px =
+				2 * gutter_padding +
+				gutter_edge_distance * f32(len(gutter.edges))
 		}
 	}
 
@@ -617,13 +707,19 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 			if from_node.position.y + 1 == to_node.position.y &&
 			   from_node.position.x == to_node.position.x {
 				// upper edge of to_node 
-				edge.segments[1] = to_node.position_px + (0.5 * {graph.node_size.x, 0})
+				edge.segments[1] =
+					to_node.position_px + (0.5 * {graph.node_size.x, 0})
 				edge.arrow_direction = .Down
 				continue
 			}
 
-			horizontal_gutter := graph.gutters_horizontal[from_node.position.y + 1]
-			horizontal_lane := graph_horizontal_lane_for_edge(graph, &horizontal_gutter, edge.from)
+			horizontal_gutter :=
+				graph.gutters_horizontal[from_node.position.y + 1]
+			horizontal_lane := graph_horizontal_lane_for_edge(
+				graph,
+				&horizontal_gutter,
+				edge.from,
+			)
 
 			// horizontal gutter entrance
 			edge.segments[1] = {
@@ -643,11 +739,17 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 			}
 
 			vertical_gutter := graph.gutters_vertical[vertical_gutter_idx]
-			vertical_lane := graph_vertical_lane_for_edge(graph, &vertical_gutter, edge.to)
+			vertical_lane := graph_vertical_lane_for_edge(
+				graph,
+				&vertical_gutter,
+				edge.to,
+			)
 
 			// gutter crossing
 			edge.segments[2] = {
-				vertical_gutter.pos + gutter_padding + f32(vertical_lane) * gutter_edge_distance,
+				vertical_gutter.pos +
+				gutter_padding +
+				f32(vertical_lane) * gutter_edge_distance,
 				edge.segments[1].y,
 			}
 
@@ -662,7 +764,10 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 				edge.segments[4] = {to_node.position_px.x, edge.segments[3].y}
 				edge.arrow_direction = .Right
 			} else {
-				edge.segments[4] = {to_node.position_px.x + graph.node_size.x, edge.segments[3].y}
+				edge.segments[4] = {
+					to_node.position_px.x + graph.node_size.x,
+					edge.segments[3].y,
+				}
 				edge.arrow_direction = .Left
 			}
 		}
@@ -686,7 +791,11 @@ graph_fill_predecessors_of :: proc(
 }
 
 @(private = "file")
-graph_fill_children_of :: proc(graph: ^Graph, offset: NodeOffset, result: ^[dynamic]NodeOffset) {
+graph_fill_children_of :: proc(
+	graph: ^Graph,
+	offset: NodeOffset,
+	result: ^[dynamic]NodeOffset,
+) {
 	clear(result)
 	for &edge in graph.edges {
 		if edge.from == offset {
@@ -760,6 +869,11 @@ mark_memory_used :: proc(
 	loc := #caller_location,
 ) {
 	when ODIN_DEBUG {
-		log.infof("%d - %s", uintptr(object_start) - uintptr(graph), name, location = loc)
+		log.infof(
+			"%d - %s",
+			uintptr(object_start) - uintptr(graph),
+			name,
+			location = loc,
+		)
 	}
 }
