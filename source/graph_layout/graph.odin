@@ -869,11 +869,6 @@ mark_memory_used :: proc(
 }
 
 calculate_memory :: proc(sum, new_mem, align: int) -> int {
-	// TODO use mem.align_forward_int
-	reminder := sum % align
-	if reminder == 0 {
-		return sum + new_mem
-	}
-	padding := align - reminder
-	return sum + padding + new_mem
+	aligned_sum := mem.align_forward_int(sum, align)
+	return aligned_sum + new_mem
 }
