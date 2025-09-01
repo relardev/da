@@ -2,10 +2,12 @@
 package graph_layout
 
 import "core:fmt"
+import "core:mem"
 import "core:testing"
 
 @(test)
 test_optimal_assign_quadratic :: proc(t: ^testing.T) {
+
 	tests: []struct {
 		name:  string,
 		layer: []LayerCell,
@@ -189,17 +191,26 @@ test_optimal_assign_quadratic :: proc(t: ^testing.T) {
 		},
 	}
 	for tt in tests {
-		// Normal test handling for all cases including three-clusters
-		// All expectations are now corrected based on actual behavior
+		bytes, alignment := optimal_assign_quadratic_allocation_needed(
+			len(tt.layer),
+		)
 
-		optimal_assign_quadratic(tt.layer)
+		buffer := make([]byte, bytes)
+		defer delete(buffer)
 
-		for item, i in tt.layer {
+		arena: mem.Arena
+		mem.arena_init(&arena, buffer)
+		arena_allocator := mem.arena_allocator(&arena)
+
+		optimal_assign_quadratic(tt.layer, allocator = arena_allocator)
+
+		for item, i in tt.want {
 			testing.expect(
 				t,
 				item == tt.want[i],
 				fmt.tprintf(
-					"Item at index %d is different, want: %v, got %v",
+					"[%s] Item at index %d is different, want: %v, got %v",
+					tt.name,
 					i,
 					tt.want[i],
 					item,

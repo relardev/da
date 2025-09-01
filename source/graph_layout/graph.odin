@@ -75,15 +75,6 @@ allocation_needed :: proc(
 	size: int,
 	alginment: int,
 ) {
-	calculate_memory :: proc(sum, new_mem, align: int) -> int {
-		// TODO use mem.align_forward_int
-		reminder := sum % align
-		if reminder == 0 {
-			return sum + new_mem
-		}
-		padding := align - (sum % align)
-		return sum + padding + new_mem
-	}
 
 	when ODIN_DEBUG {
 		add_memory :: proc(
@@ -502,7 +493,6 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 		}
 	}
 
-
 	// fmt.println("Layers after initial pass:", layers)
 
 	// Fill x positions
@@ -510,7 +500,7 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 	case "naive":
 	// do nothing, the x positions will be filled with layer append order
 	case "barycenter":
-		for i in 0 ..< 2 {
+		for i in 0 ..< 10 {
 			direction := i % 2
 			// fmt.println(
 			// 	"Barycenter iteration: ",
@@ -876,4 +866,14 @@ mark_memory_used :: proc(
 			location = loc,
 		)
 	}
+}
+
+calculate_memory :: proc(sum, new_mem, align: int) -> int {
+	// TODO use mem.align_forward_int
+	reminder := sum % align
+	if reminder == 0 {
+		return sum + new_mem
+	}
+	padding := align - reminder
+	return sum + padding + new_mem
 }

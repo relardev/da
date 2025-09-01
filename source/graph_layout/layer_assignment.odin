@@ -11,8 +11,54 @@ optimal_assign_quadratic_allocation_needed :: proc(
 	bytes: int,
 	alignment: int,
 ) {
-	// TODO
-	return 200000, 64
+	add_memory :: proc(sum, new_mem, align: int, _: string) -> int {
+		return calculate_memory(sum, new_mem, align)
+	}
+
+	sum := 0
+
+	// items: make([dynamic]LayerCell, 0, n) - Line 74
+	// Dynamic array with capacity n
+	sum = add_memory(
+		sum,
+		size_of(LayerCell) * n,
+		align_of(LayerCell),
+		"items backing store",
+	)
+
+	// dp_curr: make([]f32, n) - Line 115
+	// Slice of floats with length n
+	sum = add_memory(sum, size_of(f32) * n, align_of(f32), "dp_curr")
+
+	// prev_index: make([][]i16, m) - Line 120
+	// We use worst case m = n (all cells non-empty)
+	// Outer slice - array of slice headers
+	sum = add_memory(
+		sum,
+		size_of([]i16) * n,
+		align_of([]i16),
+		"prev_index outer slice array",
+	)
+	
+	// Inner arrays for prev_index - Line 125
+	// for k in 0..<m: prev_index[k] = make([]i16, n)
+	// m slices each of length n
+	sum = add_memory(
+		sum,
+		size_of(i16) * n * n,
+		align_of(i16),
+		"prev_index inner arrays",
+	)
+
+	// dp_prev: make([]f32, n) - Line 136
+	// Another slice of floats with length n
+	sum = add_memory(sum, size_of(f32) * n, align_of(f32), "dp_prev")
+
+	// slots: make([]int, m) - Line 206
+	// Worst case m = n (all cells non-empty)
+	sum = add_memory(sum, size_of(int) * n, align_of(int), "slots")
+
+	return sum, 64
 }
 
 optimal_assign_quadratic :: proc(
