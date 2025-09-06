@@ -1,0 +1,189 @@
+{
+  "name": "Last Purchase",
+  "type": "Px",
+  "enabled": true,
+  "trigger": {
+    "type": "EVENT",
+    "args": {
+      "match_conditions": [
+        {
+          "key": "$.event_type",
+          "operator": "equals",
+          "value": "Purchase"
+        },
+        {
+          "key": "$.labels.duplicated_purchase",
+          "operator": "equals",
+          "value": false
+        },
+        {
+          "key": "$.event.contents"
+        },
+        {
+          "key": "$.datetime"
+        },
+        {
+          "key": "$.session_info.value_gross"
+        }
+      ]
+    }
+  },
+  "readers": {
+    "event_reader": {
+      "type": "EVENT",
+      "args": {}
+    }
+  },
+  "writers": {
+    "profile_writer": {
+      "type": "PROFILE",
+      "args": {}
+    }
+  },
+  "nodes": {
+    "extract_ids": {
+      "type": "E_READER",
+      "args": {
+        "reader_id": "event_reader",
+        "source_path": "$.event.contents[*].product_id",
+        "source_type": "STRING",
+        "source_attr_type": "LIST",
+        "target_path": "ids"
+      }
+    },
+    "count": {
+      "type": "T_COUNT",
+      "args": {
+        "source_path": "ids",
+        "target_path": "count"
+      }
+    },
+    "set_ids": {
+      "type": "L_SET",
+      "args": {
+        "writer_id": "profile_writer",
+        "source_path": "ids",
+        "target_path": "standard.lastPurchaseProducts"
+      }
+    },
+    "set_count": {
+      "type": "L_SET",
+      "args": {
+        "writer_id": "profile_writer",
+        "source_path": "count",
+        "target_path": "standard.lastPurchaseProductsCount"
+      }
+    },
+    "set_bought_products_total": {
+      "type": "L_INCREMENT",
+      "args": {
+        "writer_id": "profile_writer",
+        "source_path": "count",
+        "target_path": "standard.boughtProductsTotal"
+      }
+    },
+    "extract_date": {
+      "type": "E_READER",
+      "args": {
+        "reader_id": "event_reader",
+        "source_path": "$.datetime",
+        "source_type": "DATETIME",
+        "source_attr_type": "VALUE",
+        "target_path": "date"
+      }
+    },
+    "set_date": {
+      "type": "L_SET",
+      "args": {
+        "writer_id": "profile_writer",
+        "source_path": "date",
+        "target_path": "standard.lastPurchaseAt"
+      }
+    },
+    "extract_category": {
+      "type": "E_READER",
+      "args": {
+        "reader_id": "event_reader",
+        "source_path": "$.event.contents[*].meta.category",
+        "source_type": "STRING",
+        "source_attr_type": "LIST",
+        "target_path": "categories"
+      }
+    },
+    "set_category": {
+      "type": "L_SET",
+      "args": {
+        "writer_id": "profile_writer",
+        "source_path": "categories",
+        "target_path": "standard.lastPurchaseProductsCategories"
+      }
+    },
+    "extract_value": {
+      "type": "E_READER",
+      "args": {
+        "reader_id": "event_reader",
+        "source_path": "$.session_info.value_gross",
+        "source_type": "FLOAT",
+        "source_attr_type": "VALUE",
+        "target_path": "gross_value"
+      }
+    },
+    "set_value": {
+      "type": "L_SET",
+      "args": {
+        "writer_id": "profile_writer",
+        "source_path": "gross_value",
+        "target_path": "standard.lastPurchaseValue"
+      }
+    },
+    "extract_names": {
+      "type": "E_READER",
+      "args": {
+        "reader_id": "event_reader",
+        "source_path": "$.event.contents[*].name",
+        "source_type": "STRING",
+        "source_attr_type": "LIST",
+        "target_path": "names"
+      }
+    },
+    "set_names": {
+      "type": "L_SET",
+      "args": {
+        "writer_id": "profile_writer",
+        "source_path": "names",
+        "target_path": "standard.lastPurchaseProductsNames"
+      }
+    }
+  },
+  "edges": {
+    "_start": [
+      "set_ids",
+      "extract_ids",
+      "extract_date",
+      "extract_category",
+      "extract_value",
+      "extract_names"
+    ],
+    "extract_ids": [
+      "set_ids",
+      "count"
+    ],
+    "count": [
+      "set_count",
+      "set_bought_products_total"
+    ],
+    "extract_date": [
+      "set_date"
+    ],
+    "extract_category": [
+      "set_category"
+    ],
+    "extract_value": [
+      "set_value"
+    ],
+    "extract_names": [
+      "set_names"
+    ]
+  }
+}
+

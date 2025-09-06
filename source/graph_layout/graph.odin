@@ -648,6 +648,41 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 			}
 		}
 
+		// Sort vertical gutters to have left arrows on the left and right on the right
+		for gutter, gutter_x in graph.gutters_vertical {
+			i := 0
+			j := len(gutter.edges)
+			look_for_left := true
+			look_for_right := true
+			for i < j {
+				if look_for_left {
+					edge := &graph.edges[gutter.edges[i]]
+					node := graph.nodes[edge.to]
+					if node.position.x >= i32(gutter_x) {
+						look_for_left = false
+					}
+					i += 1
+				}
+				if look_for_right {
+					edge := &graph.edges[gutter.edges[j - 1]]
+					node := graph.nodes[edge.to]
+					if node.position.x < i32(gutter_x) {
+						look_for_right = false
+					}
+					j -= 1
+				}
+
+				if !look_for_left && !look_for_right {
+					gutter.edges[i], gutter.edges[j] =
+						gutter.edges[j], gutter.edges[i]
+					look_for_left = true
+					look_for_right = true
+					i += 1
+					j -= 1
+				}
+			}
+		}
+
 		for &gutter in graph.gutters_vertical {
 			gutter.size_px =
 				2 * gutter_padding +
@@ -695,8 +730,7 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 			edge.segments[0] = from_node.position_px + 0.5 * graph.node_size
 
 			if from_node.position.y + 1 == to_node.position.y &&
-			   from_node.position.x == to_node.position.x {
-				// upper edge of to_node 
+			   from_node.position.x == to_node.position.x { 	// direct vertical connection
 				edge.segments[1] =
 					to_node.position_px + (0.5 * {graph.node_size.x, 0})
 				edge.arrow_direction = .Down

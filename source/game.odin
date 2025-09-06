@@ -15,6 +15,7 @@ example_node1 := #load("../examples/1node.json")
 example_node3 := #load("../examples/3node.json")
 example_big := #load("../examples/big.json")
 example_last_purchase := #load("../examples/product_purchase.json")
+example_last_purchase2 := #load("../examples/product_purchase_2.json")
 
 ZOOM_SPEED: f32 = 0.1
 MIN_ZOOM: f32 = 0.1
@@ -76,7 +77,12 @@ Element :: enum {
 g: ^Game_Memory
 
 update :: proc() {
-	g.debug_observe = make([dynamic]cstring, 0, 100, allocator = context.temp_allocator)
+	g.debug_observe = make(
+		[dynamic]cstring,
+		0,
+		100,
+		allocator = context.temp_allocator,
+	)
 	// Process inputs
 	{
 		g.mouse_position = rl.GetMousePosition()
@@ -88,7 +94,8 @@ update :: proc() {
 			rl.IsKeyDown(.LEFT_SUPER) ||
 			rl.IsKeyDown(.RIGHT_SUPER)
 
-		is_shift_down := rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT)
+		is_shift_down :=
+			rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT)
 
 		backspaces := 0
 		lefts := 0
@@ -129,14 +136,22 @@ update :: proc() {
 
 			if rl.IsKeyPressed(.F8) {
 				g.needs_redraw = true
-				mem.copy(&g.pasted[0], raw_data(example_node1), len(example_node1))
+				mem.copy(
+					&g.pasted[0],
+					raw_data(example_node1),
+					len(example_node1),
+				)
 				g.pasted_len = i32(len(example_node1))
 				clipboard_after_paste()
 			}
 
 			if rl.IsKeyPressed(.F9) {
 				g.needs_redraw = true
-				mem.copy(&g.pasted[0], raw_data(example_node3), len(example_node3))
+				mem.copy(
+					&g.pasted[0],
+					raw_data(example_node3),
+					len(example_node3),
+				)
 				g.pasted_len = i32(len(example_node3))
 				clipboard_after_paste()
 			}
@@ -150,8 +165,23 @@ update :: proc() {
 
 			if rl.IsKeyPressed(.F11) {
 				g.needs_redraw = true
-				mem.copy(&g.pasted[0], raw_data(example_last_purchase), len(example_last_purchase))
+				mem.copy(
+					&g.pasted[0],
+					raw_data(example_last_purchase),
+					len(example_last_purchase),
+				)
 				g.pasted_len = i32(len(example_last_purchase))
+				clipboard_after_paste()
+			}
+
+			if rl.IsKeyPressed(.F12) {
+				g.needs_redraw = true
+				mem.copy(
+					&g.pasted[0],
+					raw_data(example_last_purchase2),
+					len(example_last_purchase2),
+				)
+				g.pasted_len = i32(len(example_last_purchase2))
 				clipboard_after_paste()
 			}
 
@@ -198,7 +228,10 @@ update :: proc() {
 
 
 			if strings.builder_len(g.input_text) > 0 {
-				textedit.input_text(&g.search_textbox_state, strings.to_string(g.input_text))
+				textedit.input_text(
+					&g.search_textbox_state,
+					strings.to_string(g.input_text),
+				)
 			}
 			g.search_query = strings.to_string(g.search_textbox_state.builder^)
 
@@ -253,13 +286,19 @@ update :: proc() {
 
 	mouse_pos := g.mouse_position
 
-	observe_debug(fmt.ctprintf("Mouse: [%.2f, %.2f]", mouse_pos.x, mouse_pos.y))
+	observe_debug(
+		fmt.ctprintf("Mouse: [%.2f, %.2f]", mouse_pos.x, mouse_pos.y),
+	)
 	g.graph_selected_node = {}
 	clay.SetCurrentContext(g.clay_ui_context)
 	clay.SetPointerState(mouse_pos, rl.IsMouseButtonDown(rl.MouseButton.LEFT))
-	clay.SetLayoutDimensions({cast(f32)rl.GetScreenWidth(), cast(f32)rl.GetScreenHeight()})
+	clay.SetLayoutDimensions(
+		{cast(f32)rl.GetScreenWidth(), cast(f32)rl.GetScreenHeight()},
+	)
 	is_pointer_over_editor := clay.PointerOver(g.graph_editor_id)
-	observe_debug(fmt.ctprintf("pointer over editor: %v", is_pointer_over_editor))
+	observe_debug(
+		fmt.ctprintf("pointer over editor: %v", is_pointer_over_editor),
+	)
 	if is_pointer_over_editor {
 		// MOUSE IN GRAPH
 		clay.SetCurrentContext(g.clay_graph_context)
@@ -280,7 +319,10 @@ update :: proc() {
 				mouse_in_graph_editor.y,
 			),
 		)
-		clay.SetPointerState(mouse_in_graph_editor, rl.IsMouseButtonDown(rl.MouseButton.LEFT))
+		clay.SetPointerState(
+			mouse_in_graph_editor,
+			rl.IsMouseButtonDown(rl.MouseButton.LEFT),
+		)
 
 		// select, highlight nodes and edges
 		{
@@ -325,7 +367,11 @@ update :: proc() {
 			if wheel != 0 {
 				g.needs_redraw = true
 				if rl.IsKeyDown(.LEFT_SHIFT) {
-					clay.UpdateScrollContainers(false, rl.GetMouseWheelMoveV(), rl.GetFrameTime())
+					clay.UpdateScrollContainers(
+						false,
+						rl.GetMouseWheelMoveV(),
+						rl.GetFrameTime(),
+					)
 				} else {
 					g.camera.zoom += wheel * ZOOM_SPEED
 					g.camera.zoom = clamp(g.camera.zoom, MIN_ZOOM, MAX_ZOOM)
@@ -334,7 +380,8 @@ update :: proc() {
 						mouse_pos - (g.graph_offset * g.camera.zoom),
 						g.camera,
 					)
-					g.camera.target += mouse_in_graph_editor - new_mouse_world_pos
+					g.camera.target +=
+						mouse_in_graph_editor - new_mouse_world_pos
 					observe_debug(
 						fmt.ctprintf(
 							"Zoom: %.2f, Mouse World Pos: [%.2f, %.2f], %.2f, %.2f",
@@ -351,7 +398,11 @@ update :: proc() {
 		}
 	} else {
 		// MOUSE IN UI
-		clay.UpdateScrollContainers(false, rl.GetMouseWheelMoveV(), rl.GetFrameTime())
+		clay.UpdateScrollContainers(
+			false,
+			rl.GetMouseWheelMoveV(),
+			rl.GetFrameTime(),
+		)
 	}
 	if g.prev_mouse_pos != mouse_pos {
 		g.needs_redraw = true
@@ -372,7 +423,13 @@ draw :: proc() {
 		rl.DrawFPS(10, 10)
 	}
 	for msg, i in g.debug_observe {
-		rl.DrawText(msg, 10, rl.GetScreenHeight() - 30 * i32(i + 1), 20, rl.WHITE)
+		rl.DrawText(
+			msg,
+			10,
+			rl.GetScreenHeight() - 30 * i32(i + 1),
+			20,
+			rl.WHITE,
+		)
 	}
 	rl.EndDrawing()
 }
