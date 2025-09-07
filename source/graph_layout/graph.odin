@@ -52,7 +52,7 @@ ArrowDirection :: enum u8 {
 Edge :: struct {
 	from:            NodeOffset, // 2 bytes
 	to:              NodeOffset, // 2 bytes
-	segments:        [5]V2,
+	segments:        [5]Segment,
 	arrow_direction: ArrowDirection,
 }
 
@@ -362,9 +362,24 @@ graph_read_node :: proc(graph: ^Graph, external_id: ExternalID) -> (V2, bool) {
 }
 
 EdgeResult :: struct {
-	segments:        []V2,
+	start:           V2,
+	segments:        []Segment,
 	arrow_direction: ArrowDirection,
 }
+
+Segment :: union {
+	Point,
+	Bridge,
+}
+
+Point :: struct {
+	end: V2,
+}
+
+Bridge :: struct {
+	end: V2,
+}
+
 
 graph_read_edge :: proc(
 	graph: ^Graph,
@@ -785,12 +800,16 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 			to_node := graph.nodes[edge.to]
 
 			// middle of from_node
-			edge.segments[0] = from_node.position_px + 0.5 * graph.node_size
+			edge_segment_0 := from_node.position_px + 0.5 * graph.node_size
+			edge.segments[0] = Point {
+				end = edge_segment_0,
+			}
 
 			if from_node.position.y + 1 == to_node.position.y &&
 			   from_node.position.x == to_node.position.x { 	// direct vertical connection
-				edge.segments[1] =
-					to_node.position_px + (0.5 * {graph.node_size.x, 0})
+				edge.segments[1] = Point {
+					end = to_node.position_px + (0.5 * {graph.node_size.x, 0}),
+				}
 				edge.arrow_direction = .Down
 				continue
 			}
@@ -803,12 +822,13 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 				edge.from,
 			)
 
-			// horizontal gutter entrance
-			edge.segments[1] = {
-				edge.segments[0].x,
+			edge_segment_1_y :=
 				horizontal_gutter.pos +
 				gutter_padding +
-				f32(horizontal_lane) * gutter_edge_distance,
+				f32(horizontal_lane) * gutter_edge_distance
+			// horizontal gutter entrance
+			edge.segments[1] = Point {
+				end = {edge_segment_0.x, edge_segment_1_y},
 			}
 
 			vertical_gutter_idx: int
@@ -827,12 +847,13 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 				edge.from,
 			)
 
-			// gutter crossing
-			edge.segments[2] = {
+			edge_segment_2_x :=
 				vertical_gutter.pos +
 				gutter_padding +
-				f32(vertical_lane) * gutter_edge_distance,
-				edge.segments[1].y,
+				f32(vertical_lane) * gutter_edge_distance
+			// gutter crossing
+			edge.segments[2] = Point {
+				end = {edge_segment_2_x, edge_segment_1_y},
 			}
 
 
@@ -872,22 +893,28 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 				panic("Edge from node not found in incomming nodes set")
 			}
 
-			// vertical gutter exit
-			edge.segments[3] = {
-				edge.segments[2].x,
+			edge_segment_3_x := edge_segment_2_x
+			edge_segment_3_y :=
 				to_node.position_px.y +
 				node_landing_padding +
-				percentage * (graph.node_size.y - 2 * node_landing_padding),
+				percentage * (graph.node_size.y - 2 * node_landing_padding)
+			// vertical gutter exit
+			edge.segments[3] = Point {
+				end = {edge_segment_3_x, edge_segment_3_y},
 			}
 
 			// target edge
-			if edge.segments[3].x < to_node.position_px.x {
-				edge.segments[4] = {to_node.position_px.x, edge.segments[3].y}
+			if edge_segment_3_x < to_node.position_px.x {
+				edge.segments[4] = Point {
+					end = {to_node.position_px.x, edge_segment_3_y},
+				}
 				edge.arrow_direction = .Right
 			} else {
-				edge.segments[4] = {
-					to_node.position_px.x + graph.node_size.x,
-					edge.segments[3].y,
+				edge.segments[4] = Point {
+					end = {
+						to_node.position_px.x + graph.node_size.x,
+						edge_segment_3_y,
+					},
 				}
 				edge.arrow_direction = .Left
 			}

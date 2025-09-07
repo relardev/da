@@ -30,7 +30,11 @@ recipe_create_from_pasted :: proc() {
 
 	mem.dynamic_arena_free_all(&g.recipe_arena)
 	g.recipe = new(Recipe, allocator = g.recipe_allocator)
-	err := json.unmarshal(g.pasted[:g.pasted_len + 1], g.recipe, allocator = g.recipe_allocator)
+	err := json.unmarshal(
+		g.pasted[:g.pasted_len + 1],
+		g.recipe,
+		allocator = g.recipe_allocator,
+	)
 	if err != nil {
 		log.error("Failed to unmarshal recipe: %v", err)
 		return
@@ -40,7 +44,11 @@ recipe_create_from_pasted :: proc() {
 
 	// Start node (triggers)
 	match_conditions := g.recipe.Trigger.Args["match_conditions"]
-	start_args := make([]Argument, len(match_conditions), allocator = g.recipe_allocator)
+	start_args := make(
+		[]Argument,
+		len(match_conditions),
+		allocator = g.recipe_allocator,
+	)
 	for match_condition, i in match_conditions {
 		str: string
 		if match_condition.Operator != "" {
@@ -52,20 +60,38 @@ recipe_create_from_pasted :: proc() {
 				allocator = g.recipe_allocator,
 			)
 		} else {
-			str = fmt.aprintf("%v exists", match_condition.Key, allocator = g.recipe_allocator)
+			str = fmt.aprintf(
+				"%v exists",
+				match_condition.Key,
+				allocator = g.recipe_allocator,
+			)
 		}
 		start_args[i] = argument_create(str, &last_attribute_id)
 	}
 	hm.add(&g.graph.nodes, Node{name = "_start", arguments = start_args})
 
 	// Create nodes
-	future_edges := make([dynamic]FutureEdge, 0, 8, allocator = g.recipe_allocator)
+	future_edges := make(
+		[dynamic]FutureEdge,
+		0,
+		8,
+		allocator = g.recipe_allocator,
+	)
 	for name, node_def in g.recipe.Nodes {
-		arguments := make([]Argument, len(node_def.Args), allocator = g.recipe_allocator)
+		arguments := make(
+			[]Argument,
+			len(node_def.Args),
+			allocator = g.recipe_allocator,
+		)
 		i := 0
 		for key, value in node_def.Args {
 			arguments[i] = argument_create(
-				fmt.aprintf("%v: %v", key, value, allocator = g.recipe_allocator),
+				fmt.aprintf(
+					"%v: %v",
+					key,
+					value,
+					allocator = g.recipe_allocator,
+				),
 				&last_attribute_id,
 			)
 			i += 1
@@ -74,19 +100,30 @@ recipe_create_from_pasted :: proc() {
 		case "C_IF":
 			if_handle := hm.add(
 				&g.graph.nodes,
-				Node{name = name, type = node_def.Type, arguments = arguments, is_if_node = true},
+				Node {
+					name = name,
+					type = node_def.Type,
+					arguments = arguments,
+					is_if_node = true,
+				},
 			)
 
 			trues := node_def.Args["true_node_ids"].(json.Array)
 			for true_node_name in trues {
 				true_node_name := true_node_name.(json.String)
-				append(&future_edges, FutureEdge{from = if_handle, to = true_node_name})
+				append(
+					&future_edges,
+					FutureEdge{from = if_handle, to = true_node_name},
+				)
 			}
 
 			falses := node_def.Args["false_node_ids"].(json.Array)
 			for false_node_name in falses {
 				false_node_name := false_node_name.(json.String)
-				append(&future_edges, FutureEdge{from = if_handle, to = false_node_name})
+				append(
+					&future_edges,
+					FutureEdge{from = if_handle, to = false_node_name},
+				)
 			}
 		case "C_DELAY":
 			delay := hm.add(
@@ -97,11 +134,17 @@ recipe_create_from_pasted :: proc() {
 			next_nodes := node_def.Args["next_node_ids"].(json.Array)
 			for next_node in next_nodes {
 				true_node_name := next_node.(json.String)
-				append(&future_edges, FutureEdge{from = delay, to = true_node_name})
+				append(
+					&future_edges,
+					FutureEdge{from = delay, to = true_node_name},
+				)
 			}
 
 		case:
-			hm.add(&g.graph.nodes, Node{name = name, type = node_def.Type, arguments = arguments})
+			hm.add(
+				&g.graph.nodes,
+				Node{name = name, type = node_def.Type, arguments = arguments},
+			)
 		}
 	}
 
@@ -109,7 +152,10 @@ recipe_create_from_pasted :: proc() {
 		node_iter := hm.make_iter(&g.graph.nodes)
 		for node in hm.iter(&node_iter) {
 			if node.name == future_edge.to {
-				hm.add(&g.graph.edges, Edge{from = future_edge.from, to = node.handle})
+				hm.add(
+					&g.graph.edges,
+					Edge{from = future_edge.from, to = node.handle},
+				)
 				break
 			}
 		}
@@ -141,7 +187,12 @@ recipe_create_from_pasted :: proc() {
 		for node in hm.iter(&node_iter) {
 			if node.type == "T_NOOP" {
 				// log.info("Removing noop node: %v", node.handle)
-				outgoing_edges := make([dynamic]NodeHandle, 0, 8, allocator = g.recipe_allocator)
+				outgoing_edges := make(
+					[dynamic]NodeHandle,
+					0,
+					8,
+					allocator = g.recipe_allocator,
+				)
 				edge_iter := hm.make_iter(&g.graph.edges)
 				for edge in hm.iter(&edge_iter) {
 					if edge.from == node.handle {
@@ -159,7 +210,10 @@ recipe_create_from_pasted :: proc() {
 						for outgoing_edge in outgoing_edges {
 							// Add edges from the node to all outgoing edges
 							// log.info("\tadding edge: %v -> %v", edge.from, outgoing_edge)
-							hm.add(&g.graph.edges, Edge{from = edge.from, to = outgoing_edge})
+							hm.add(
+								&g.graph.edges,
+								Edge{from = edge.from, to = outgoing_edge},
+							)
 						}
 					}
 				}
@@ -209,9 +263,27 @@ recipe_create_from_pasted :: proc() {
 
 		edge_iter = hm.make_iter(&g.graph.edges)
 		for edge in hm.iter(&edge_iter) {
-			result, ok := gl.graph_read_edge(gl_graph, gl.id(edge.from), gl.id(edge.to))
+			result, ok := gl.graph_read_edge(
+				gl_graph,
+				gl.id(edge.from),
+				gl.id(edge.to),
+			)
+			segments := make(
+				[dynamic]Vec2,
+				0,
+				len(result.segments),
+				allocator = g.recipe_allocator,
+			)
+
 			assert(ok, "Failed to read edge to position")
-			edge.segments = result.segments
+			for segment in result.segments {
+				switch x in segment {
+				case gl.Point:
+					append(&segments, x.end)
+				case gl.Bridge:
+				}
+			}
+			edge.segments = segments[:]
 			edge.arrow_direction = result.arrow_direction
 		}
 
