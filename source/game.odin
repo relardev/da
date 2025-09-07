@@ -16,6 +16,7 @@ example_node3 := #load("../examples/3node.json")
 example_big := #load("../examples/big.json")
 example_last_purchase := #load("../examples/product_purchase.json")
 example_last_purchase2 := #load("../examples/product_purchase_2.json")
+example_test_vertical := #load("../examples/vertical_gutter_test.json")
 
 ZOOM_SPEED: f32 = 0.1
 MIN_ZOOM: f32 = 0.1
@@ -182,6 +183,17 @@ update :: proc() {
 					len(example_last_purchase2),
 				)
 				g.pasted_len = i32(len(example_last_purchase2))
+				clipboard_after_paste()
+			}
+
+			if rl.IsKeyPressed(.ONE) {
+				g.needs_redraw = true
+				mem.copy(
+					&g.pasted[0],
+					raw_data(example_test_vertical),
+					len(example_test_vertical),
+				)
+				g.pasted_len = i32(len(example_test_vertical))
 				clipboard_after_paste()
 			}
 

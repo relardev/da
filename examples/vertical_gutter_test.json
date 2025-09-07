@@ -1,0 +1,102 @@
+{
+  "name": "Vertical Gutter Test",
+  "type": "Dot",
+  "enabled": true,
+  "partner_id": "__all__",
+  "trigger": {
+    "type": "EVENT",
+    "args": {
+      "match_conditions": [
+        {
+          "key": "$.client.deviceatlas.primaryHardwareType"
+        },
+        {
+          "key": "$.stat.pos",
+          "operator": "equals",
+          "value": "T"
+        }
+      ]
+    }
+  },
+  "nodes": {
+    "0": {
+      "type": "E_START",
+      "args": {}
+    },
+    "a": {
+      "type": "E_READER",
+      "args": {
+        "reader_id": "event_reader",
+        "source_path": "$.client.deviceatlas.primaryHardwareType",
+        "source_type": "STRING",
+        "source_attr_type": "VALUE",
+        "target_path": "deviceType"
+      }
+    },
+    "b": {
+      "type": "E_NEXT",
+      "args": {
+        "next_scenario": "Device Model scenario"
+      }
+    },
+    "c": {
+      "type": "E_GUTTER",
+      "args": {
+        "gutter_type": "VERTICAL",
+        "gutter_size": 50
+      }
+    },
+    "d": {
+      "type": "E_GUTTER",
+      "args": {
+        "gutter_type": "HORIZONTAL",
+        "gutter_size": 30
+      }
+    },
+    "e": {
+      "type": "E_GUTTER",
+      "args": {
+        "gutter_type": "BOTH",
+        "gutter_size": 20
+      }
+    },
+    "f": {
+      "type": "E_GUTTER",
+      "args": {
+        "gutter_type": "NONE",
+        "gutter_size": 0
+      }
+    }
+  },
+  "edges": {
+    "0": [
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f"
+    ],
+    "_start": [
+      "0",
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+      "f"
+    ],
+    "a": [
+      "c"
+    ],
+    "b": [
+      "d"
+    ],
+    "c": [
+      "e"
+    ],
+    "d": [
+      "f"
+    ]
+  }
+}

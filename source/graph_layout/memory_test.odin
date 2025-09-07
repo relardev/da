@@ -7,40 +7,40 @@ import "core:testing"
 @(test)
 test_allocation_needed_constant_memory :: proc(t: ^testing.T) {
 	tests := []struct {
-		name: string,
-		nodes: int,
-		edges: int,
-		expected_size: int,
+		name:               string,
+		nodes:              int,
+		edges:              int,
+		expected_size:      int,
 		expected_alignment: int,
-	}{
+	} {
 		{
 			name = "Small graph (10 nodes, 15 edges)",
 			nodes = 10,
 			edges = 15,
-			expected_size = 10356,
+			expected_size = 11112,
 			expected_alignment = 64,
 		},
 		{
 			name = "Medium graph (50 nodes, 100 edges)",
 			nodes = 50,
 			edges = 100,
-			expected_size = 61168,
+			expected_size = 63912,
 			expected_alignment = 64,
 		},
 		{
 			name = "Large graph (100 nodes, 200 edges)",
 			nodes = 100,
 			edges = 200,
-			expected_size = 131248,
+			expected_size = 136568,
 			expected_alignment = 64,
 		},
 	}
 
 	for tt in tests {
 		size, alignment := allocation_needed(tt.nodes, tt.edges)
-		
+
 		testing.expect(
-			t, 
+			t,
 			size == tt.expected_size,
 			fmt.tprintf(
 				"[%s] Memory size changed: expected %d, got %d",
@@ -49,7 +49,7 @@ test_allocation_needed_constant_memory :: proc(t: ^testing.T) {
 				size,
 			),
 		)
-		
+
 		testing.expect(
 			t,
 			alignment == tt.expected_alignment,
@@ -64,13 +64,15 @@ test_allocation_needed_constant_memory :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_optimal_assign_quadratic_allocation_needed_constant_memory :: proc(t: ^testing.T) {
+test_optimal_assign_quadratic_allocation_needed_constant_memory :: proc(
+	t: ^testing.T,
+) {
 	tests := []struct {
-		name: string,
-		n: int,
-		expected_bytes: int,
+		name:               string,
+		n:                  int,
+		expected_bytes:     int,
 		expected_alignment: int,
-	}{
+	} {
 		{
 			name = "Empty layer",
 			n = 0,
@@ -99,7 +101,7 @@ test_optimal_assign_quadratic_allocation_needed_constant_memory :: proc(t: ^test
 
 	for tt in tests {
 		bytes, alignment := optimal_assign_quadratic_allocation_needed(tt.n)
-		
+
 		testing.expect(
 			t,
 			bytes == tt.expected_bytes,
@@ -110,7 +112,7 @@ test_optimal_assign_quadratic_allocation_needed_constant_memory :: proc(t: ^test
 				bytes,
 			),
 		)
-		
+
 		testing.expect(
 			t,
 			alignment == tt.expected_alignment,

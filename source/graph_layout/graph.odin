@@ -11,6 +11,7 @@ _ :: log
 
 gutter_edge_distance :: 10.0 // distance between edges in gutters
 gutter_padding :: 40.0 // padding around gutters
+node_landing_padding :: 10.0 // padding for node side where edge arrows can "land"
 
 // GRAPH_X_ALGORITHM :: "naive"
 GRAPH_X_ALGORITHM :: "barycenter"
@@ -236,6 +237,25 @@ allocation_needed :: proc(
 		gutter_edge_elements_size,
 		align_of(EdgeOffset),
 		"Gutters Horizontal Edges",
+	)
+
+	sum = add_memory(
+		sum,
+		int(
+			runtime.map_total_allocation_size(
+				uintptr(max(nodes - 1, 8)),
+				runtime.map_info(map[NodeOffset]bool),
+			),
+		),
+		64,
+		"incomming nodes set",
+	)
+
+	sum = add_memory(
+		sum,
+		size_of([dynamic]NodeOffset) * (nodes - 1),
+		align_of(NodeOffset),
+		"incomming nodes array",
 	)
 
 	return sum, 64
@@ -651,7 +671,11 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 		// Sort vertical gutters to have left arrows on the left and right on the right
 		for gutter, gutter_x in graph.gutters_vertical {
 			i := 0
-			j := len(gutter.edges)
+			length := len(gutter.edges)
+			if length <= 0 {
+				continue
+			}
+			j := length - 1
 			look_for_left := true
 			look_for_right := true
 			for i < j {
@@ -660,16 +684,18 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 					node := graph.nodes[edge.to]
 					if node.position.x >= i32(gutter_x) {
 						look_for_left = false
+					} else {
+						i += 1
 					}
-					i += 1
 				}
 				if look_for_right {
-					edge := &graph.edges[gutter.edges[j - 1]]
+					edge := &graph.edges[gutter.edges[j]]
 					node := graph.nodes[edge.to]
 					if node.position.x < i32(gutter_x) {
 						look_for_right = false
+					} else {
+						j -= 1
 					}
-					j -= 1
 				}
 
 				if !look_for_left && !look_for_right {
@@ -722,6 +748,38 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 
 	// Fill edge segments
 	{
+		// unique nodes that lead to this node via gutter
+		incomming_nodes_set := make(
+			map[NodeOffset]bool,
+			map_capacity(len(graph.nodes) - 1),
+			allocator = graph.allocator,
+		)
+
+		incomming_nodes_set.allocator = mem.panic_allocator()
+		mark_memory_used(
+			graph,
+			rawptr(
+				runtime.map_data(
+					transmute(runtime.Raw_Map)incomming_nodes_set,
+				),
+			),
+			"incomming nodes",
+		)
+
+		incomming_nodes_array := make(
+			[dynamic]NodeOffset,
+			0,
+			len(graph.nodes) - 1,
+			allocator = graph.allocator,
+		)
+		incomming_nodes_array.allocator = mem.panic_allocator()
+
+		mark_memory_used(
+			graph,
+			raw_data(incomming_nodes_array),
+			"incomming nodes array",
+		)
+
 		for &edge in graph.edges {
 			from_node := graph.nodes[edge.from]
 			to_node := graph.nodes[edge.to]
@@ -766,7 +824,7 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 			vertical_lane := graph_vertical_lane_for_edge(
 				graph,
 				&vertical_gutter,
-				edge.to,
+				edge.from,
 			)
 
 			// gutter crossing
@@ -777,10 +835,49 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 				edge.segments[1].y,
 			}
 
+
+			sibling_node_offset := sibling(
+				graph,
+				&to_node,
+				edge.to,
+				vertical_gutter_idx,
+			)
+
+			clear(&incomming_nodes_set)
+			clear(&incomming_nodes_array)
+
+			for edge_offset in vertical_gutter.edges {
+				edge_in_gutter := &graph.edges[edge_offset]
+				if edge_in_gutter.to == edge.to ||
+				   edge_in_gutter.to == sibling_node_offset {
+					incomming_nodes_set[edge_in_gutter.from] = true
+				}
+			}
+
+			for node_offset, _ in incomming_nodes_set {
+				append(&incomming_nodes_array, node_offset)
+			}
+
+			slice.sort(incomming_nodes_array[:])
+
+			percentage: f32 = -1
+			for node_offset, i in incomming_nodes_array {
+				if node_offset == edge.from {
+					percentage =
+						(1 + f32(i)) / f32(len(incomming_nodes_array) + 1)
+					break
+				}
+			}
+			if percentage == -1 {
+				panic("Edge from node not found in incomming nodes set")
+			}
+
 			// vertical gutter exit
 			edge.segments[3] = {
 				edge.segments[2].x,
-				to_node.position_px.y + 0.5 * graph.node_size.y,
+				to_node.position_px.y +
+				node_landing_padding +
+				percentage * (graph.node_size.y - 2 * node_landing_padding),
 			}
 
 			// target edge
@@ -874,7 +971,7 @@ graph_vertical_lane_for_edge :: proc(
 ) -> i32 {
 	for offset, i in gutter.edges {
 		edge := &graph.edges[offset]
-		if edge.to == node_offset {
+		if edge.from == node_offset {
 			return i32(i)
 		}
 	}
@@ -893,6 +990,9 @@ mark_memory_used :: proc(
 	loc := #caller_location,
 ) {
 	when ODIN_DEBUG {
+		if object_start == nil {
+			panic("object_start is nil")
+		}
 		log.infof(
 			"%d - %s",
 			uintptr(object_start) - uintptr(graph),
@@ -905,4 +1005,39 @@ mark_memory_used :: proc(
 calculate_memory :: proc(sum, new_mem, align: int) -> int {
 	aligned_sum := mem.align_forward_int(sum, align)
 	return aligned_sum + new_mem
+}
+
+map_capacity :: proc(n: int) -> int {
+	return (4 * n + 2) / 3
+}
+
+map_mem_ussage :: proc(n: int, $T: typeid/map[$K]$V) -> int {
+	return int(
+		runtime.map_total_allocation_size(
+			uintptr(max(n, 8)),
+			runtime.map_info(map[$K]$V),
+		),
+	)
+}
+
+// finds a sibling node next to `node` on the other side of vertical_gutter
+// if no sibling is found, returns self
+sibling :: proc(
+	graph: ^Graph,
+	node: ^Node,
+	node_offset: NodeOffset,
+	vertical_gutter_pos: int,
+) -> NodeOffset {
+	direction := vertical_gutter_pos == int(node.position.x) ? i32(-1) : i32(1)
+
+	sibling_x := node.position.x + direction
+	for other_node, offset in graph.nodes {
+		if other_node.position.y == node.position.y &&
+		   other_node.position.x == sibling_x {
+			return NodeOffset(offset)
+		}
+	}
+
+	// no sibling found, return self
+	return node_offset
 }
