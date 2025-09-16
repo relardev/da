@@ -17,6 +17,7 @@ example_big := #load("../examples/big.json")
 example_last_purchase := #load("../examples/product_purchase.json")
 example_last_purchase2 := #load("../examples/product_purchase_2.json")
 example_test_vertical := #load("../examples/vertical_gutter_test.json")
+example_test_bridge := #load("../examples/bridge.json")
 
 ZOOM_SPEED: f32 = 0.1
 MIN_ZOOM: f32 = 0.1
@@ -194,6 +195,17 @@ update :: proc() {
 					len(example_test_vertical),
 				)
 				g.pasted_len = i32(len(example_test_vertical))
+				clipboard_after_paste()
+			}
+
+			if rl.IsKeyPressed(.TWO) {
+				g.needs_redraw = true
+				mem.copy(
+					&g.pasted[0],
+					raw_data(example_test_bridge),
+					len(example_test_bridge),
+				)
+				g.pasted_len = i32(len(example_test_bridge))
 				clipboard_after_paste()
 			}
 

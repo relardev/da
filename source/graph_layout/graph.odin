@@ -12,6 +12,7 @@ _ :: log
 gutter_edge_distance :: 10.0 // distance between edges in gutters
 gutter_padding :: 40.0 // padding around gutters
 node_landing_padding :: 10.0 // padding for node side where edge arrows can "land"
+bridge_gap :: 5.0 // gap size for edge crossings, whole gap will be 2*bridge_gap
 
 // GRAPH_X_ALGORITHM :: "naive"
 GRAPH_X_ALGORITHM :: "barycenter"
@@ -52,7 +53,8 @@ ArrowDirection :: enum u8 {
 Edge :: struct {
 	from:            NodeOffset, // 2 bytes
 	to:              NodeOffset, // 2 bytes
-	segments:        [5]Segment,
+	// TODO use small array
+	segments:        [64]Segment,
 	arrow_direction: ArrowDirection,
 }
 
@@ -367,19 +369,15 @@ EdgeResult :: struct {
 	arrow_direction: ArrowDirection,
 }
 
-Segment :: union {
+SegmentType :: enum u8 {
 	Point,
 	Bridge,
 }
 
-Point :: struct {
-	end: V2,
+Segment :: struct {
+	type: SegmentType,
+	end:  V2,
 }
-
-Bridge :: struct {
-	end: V2,
-}
-
 
 graph_read_edge :: proc(
 	graph: ^Graph,
@@ -423,8 +421,15 @@ graph_read_edge :: proc(
 
 	for &edge in graph.edges {
 		if edge.from == from_offset && edge.to == to_offset {
+			first_zero := 64
+			for segment, i in edge.segments {
+				if segment == {} {
+					first_zero = i
+					break
+				}
+			}
 			return EdgeResult {
-					segments = edge.segments[:],
+					segments = edge.segments[:first_zero],
 					arrow_direction = edge.arrow_direction,
 				},
 				true
@@ -801,14 +806,16 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 
 			// middle of from_node
 			edge_segment_0 := from_node.position_px + 0.5 * graph.node_size
-			edge.segments[0] = Point {
-				end = edge_segment_0,
+			edge.segments[0] = Segment {
+				type = .Point,
+				end  = edge_segment_0,
 			}
 
 			if from_node.position.y + 1 == to_node.position.y &&
 			   from_node.position.x == to_node.position.x { 	// direct vertical connection
-				edge.segments[1] = Point {
-					end = to_node.position_px + (0.5 * {graph.node_size.x, 0}),
+				edge.segments[1] = Segment {
+					type = .Point,
+					end  = to_node.position_px + (0.5 * {graph.node_size.x, 0}),
 				}
 				edge.arrow_direction = .Down
 				continue
@@ -827,8 +834,9 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 				gutter_padding +
 				f32(horizontal_lane) * gutter_edge_distance
 			// horizontal gutter entrance
-			edge.segments[1] = Point {
-				end = {edge_segment_0.x, edge_segment_1_y},
+			edge.segments[1] = Segment {
+				type = .Point,
+				end  = {edge_segment_0.x, edge_segment_1_y},
 			}
 
 			vertical_gutter_idx: int
@@ -852,8 +860,9 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 				gutter_padding +
 				f32(vertical_lane) * gutter_edge_distance
 			// gutter crossing
-			edge.segments[2] = Point {
-				end = {edge_segment_2_x, edge_segment_1_y},
+			edge.segments[2] = Segment {
+				type = .Point,
+				end  = {edge_segment_2_x, edge_segment_1_y},
 			}
 
 
@@ -899,24 +908,165 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 				node_landing_padding +
 				percentage * (graph.node_size.y - 2 * node_landing_padding)
 			// vertical gutter exit
-			edge.segments[3] = Point {
-				end = {edge_segment_3_x, edge_segment_3_y},
+			edge.segments[3] = Segment {
+				type = .Point,
+				end  = {edge_segment_3_x, edge_segment_3_y},
 			}
 
 			// target edge
 			if edge_segment_3_x < to_node.position_px.x {
-				edge.segments[4] = Point {
-					end = {to_node.position_px.x, edge_segment_3_y},
+				edge.segments[4] = Segment {
+					type = .Point,
+					end  = {to_node.position_px.x, edge_segment_3_y},
 				}
 				edge.arrow_direction = .Right
 			} else {
-				edge.segments[4] = Point {
-					end = {
+				edge.segments[4] = Segment {
+					type = .Point,
+					end  = {
 						to_node.position_px.x + graph.node_size.x,
 						edge_segment_3_y,
 					},
 				}
 				edge.arrow_direction = .Left
+			}
+		}
+
+		insertBridge :: proc(
+			segments: []Segment,
+			idx: int,
+			start, end: V2,
+		) -> bool {
+			if segments[len(segments) - 1] != {} ||
+			   segments[len(segments) - 2] != {} {
+				return false // no space for bridge
+			}
+
+			// create 2 empty spaces for point and bridge
+			for i := len(segments) - 1; i - 2 >= idx; i -= 1 {
+				segments[i] = segments[i - 2]
+			}
+
+			segments[idx] = Segment {
+				type = .Point,
+				end  = start,
+			}
+
+			segments[idx + 1] = Segment {
+				type = .Bridge,
+				end  = end,
+			}
+
+			return true
+		}
+
+		isVertical :: proc(start, end: V2) -> bool {return start.x == end.x}
+		crossingPoint :: proc(
+			a_start, a_end, b_start, b_end: V2,
+		) -> (
+			V2,
+			bool,
+		) {
+			// Direction vectors
+			r := a_end - a_start
+			s := b_end - b_start
+
+			// Cross product (r x s)
+			cross_rs := r.x * s.y - r.y * s.x
+
+			// Parallel or collinear
+			if cross_rs == 0.0 {
+				return {0, 0}, false
+			}
+
+			// Compute t and u
+			diff := b_start - a_start
+			t := (diff.x * s.y - diff.y * s.x) / cross_rs
+			u := (diff.x * r.y - diff.y * r.x) / cross_rs
+
+			// Check if intersection is within both segments
+			if t >= 0.0 && t <= 1.0 && u >= 0.0 && u <= 1.0 {
+				intersection := a_start + r * t
+				return intersection, true
+			}
+
+			return {0, 0}, false
+		}
+
+		for &edge, edge_offset in graph.edges {
+			node_from := &graph.nodes[edge.from]
+			for i := 1; i < len(edge.segments); i += 1 {
+				segment := &edge.segments[i]
+				if segment^ == {} {
+					break
+				}
+				prev_segment := &edge.segments[i - 1]
+				for &edge_candidate in graph.edges[edge_offset + 1:] {
+					from_node_candidate := &graph.nodes[edge_candidate.from]
+					if from_node_candidate == node_from {
+						continue
+					}
+					for j := 1; j < len(edge_candidate.segments); j += 1 {
+						segment_candidate := &edge_candidate.segments[j]
+						if segment_candidate^ == {} {
+							break
+						}
+						prev_segment_candidate := &edge_candidate.segments[j - 1]
+
+						cross, didCross := crossingPoint(
+							prev_segment.end,
+							segment.end,
+							prev_segment_candidate.end,
+							segment_candidate.end,
+						)
+						if didCross {
+							idx: int
+							segments_to_insert_bridge_into: []Segment
+
+							if edge_candidate.from < edge.from {
+								idx = i
+								i += 2
+								segments_to_insert_bridge_into =
+								edge.segments[:]
+							} else {
+								idx = j
+								j += 2
+								segments_to_insert_bridge_into =
+								edge_candidate.segments[:]
+							}
+
+							prev := &segments_to_insert_bridge_into[idx - 1]
+							next := &segments_to_insert_bridge_into[idx]
+
+							start, end: V2
+							if isVertical(prev.end, next.end) {
+								if prev.end.y < next.end.y { 	// going down
+									start = cross + {0, -bridge_gap}
+									end = cross + {0, bridge_gap}
+								} else { 	// going up
+									start = cross + {0, bridge_gap}
+									end = cross + {0, -bridge_gap}
+									panic("Edges should not go up")
+								}
+							} else {
+								if prev.end.x < next.end.x { 	// going right
+									start = cross + {-bridge_gap, 0}
+									end = cross + {bridge_gap, 0}
+								} else { 	// going left
+									start = cross + {bridge_gap, 0}
+									end = cross + {-bridge_gap, 0}
+								}
+							}
+							inserted := insertBridge(
+								segments_to_insert_bridge_into,
+								idx,
+								start,
+								end,
+							)
+							if !inserted {panic("No space for bridge")}
+						}
+					}
+				}
 			}
 		}
 	}

@@ -1,0 +1,49 @@
+{
+  "name": "Device Model scenario",
+  "type": "Dot",
+  "enabled": true,
+  "partner_id": "__all__",
+  "trigger": {
+    "type": "EVENT",
+    "args": {
+      "match_conditions": [
+        {
+          "key": "$.client.deviceatlas.primaryHardwareType"
+        },
+        {
+          "key": "$.stat.pos",
+          "operator": "equals",
+          "value": "T"
+        }
+      ]
+    }
+  },
+  "nodes": {
+    "a": {
+      "a": 1
+    },
+    "b": {
+      "b": 1
+    },
+    "c": {
+      "c": 1
+    },
+    "d": {
+      "d": 1
+    }
+  },
+  "edges": {
+    "_start": [
+      "a",
+      "b"
+    ],
+    "a": [
+      "c",
+      "d"
+    ],
+    "b": [
+      "c",
+      "d"
+    ]
+  }
+}

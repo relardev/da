@@ -51,7 +51,9 @@ clay_raylib_render :: proc(
 		case .Text:
 			config := render_command.renderData.text
 
-			text := string(config.stringContents.chars[:config.stringContents.length])
+			text := string(
+				config.stringContents.chars[:config.stringContents.length],
+			)
 
 			// Raylib uses C strings instead of Odin strings, so we need to clone
 			// Assume this will be freed elsewhere since we default to the temp allocator
@@ -97,7 +99,9 @@ clay_raylib_render :: proc(
 		case .Rectangle:
 			config := render_command.renderData.rectangle
 			if config.cornerRadius.topLeft > 0 {
-				radius: f32 = (config.cornerRadius.topLeft * 2) / min(bounds.width, bounds.height)
+				radius: f32 =
+					(config.cornerRadius.topLeft * 2) /
+					min(bounds.width, bounds.height)
 				draw_rect_rounded(
 					bounds.x,
 					bounds.y,
@@ -107,7 +111,13 @@ clay_raylib_render :: proc(
 					config.backgroundColor,
 				)
 			} else {
-				draw_rect(bounds.x, bounds.y, bounds.width, bounds.height, config.backgroundColor)
+				draw_rect(
+					bounds.x,
+					bounds.y,
+					bounds.width,
+					bounds.height,
+					config.backgroundColor,
+				)
 			}
 		case .Border:
 			config := render_command.renderData.border
@@ -117,7 +127,9 @@ clay_raylib_render :: proc(
 					bounds.x,
 					bounds.y + config.cornerRadius.topLeft,
 					f32(config.width.left),
-					bounds.height - config.cornerRadius.topLeft - config.cornerRadius.bottomLeft,
+					bounds.height -
+					config.cornerRadius.topLeft -
+					config.cornerRadius.bottomLeft,
 					config.color,
 				)
 			}
@@ -127,7 +139,9 @@ clay_raylib_render :: proc(
 					bounds.x + bounds.width - f32(config.width.right),
 					bounds.y + config.cornerRadius.topRight,
 					f32(config.width.right),
-					bounds.height - config.cornerRadius.topRight - config.cornerRadius.bottomRight,
+					bounds.height -
+					config.cornerRadius.topRight -
+					config.cornerRadius.bottomRight,
 					config.color,
 				)
 			}
@@ -136,7 +150,9 @@ clay_raylib_render :: proc(
 				draw_rect(
 					bounds.x + config.cornerRadius.topLeft,
 					bounds.y,
-					bounds.width - config.cornerRadius.topLeft - config.cornerRadius.topRight,
+					bounds.width -
+					config.cornerRadius.topLeft -
+					config.cornerRadius.topRight,
 					f32(config.width.top),
 					config.color,
 				)
@@ -212,7 +228,8 @@ clay_raylib_render :: proc(
 				rl.BeginMode2D(g.camera)
 				clay.SetCurrentContext(g.clay_graph_context)
 				layout_graph_create()
-				graph_render_commands: clay.ClayArray(clay.RenderCommand) = layout_graph_create()
+				graph_render_commands: clay.ClayArray(clay.RenderCommand) =
+					layout_graph_create()
 				g.graph_offset = Vec2{bounds.x, bounds.y}
 				// log.info("Rendering graph at:", bounds)
 				clay_raylib_render(&graph_render_commands, g.graph_offset)
@@ -279,15 +296,27 @@ clay_raylib_render :: proc(
 								continue not_highlighted
 							}
 						}
-						draw_edge(edge, canvas_start, clay_color_to_rl_color(COLOR_EDGE_L))
+						draw_edge(
+							edge,
+							canvas_start,
+							clay_color_to_rl_color(COLOR_EDGE_L),
+						)
 					}
 					for &edge in highlighted_edges {
-						draw_edge(&edge, canvas_start, clay_color_to_rl_color(COLOR_EDGE_H))
+						draw_edge(
+							&edge,
+							canvas_start,
+							clay_color_to_rl_color(COLOR_EDGE_H),
+						)
 					}
 				} else {
 					edge_iter := hm.make_iter(&g.graph.edges)
 					for edge in hm.iter(&edge_iter) {
-						draw_edge(edge, canvas_start, clay_color_to_rl_color(COLOR_EDGE))
+						draw_edge(
+							edge,
+							canvas_start,
+							clay_color_to_rl_color(COLOR_EDGE),
+						)
 					}
 				}
 			}
@@ -295,19 +324,30 @@ clay_raylib_render :: proc(
 	}
 }
 
-draw_edge :: proc(edge: ^Edge, canvas_start: Vec2, color: rl.Color) {
+draw_edge :: proc(edge: ^Edge, canvas_start: Vec2, edge_color: rl.Color) {
 	last := 0
-	for point, i in edge.segments[1:] {
-		if point == {} {
+	color: rl.Color
+	for segment, i in edge.segments[1:] {
+		if segment == {} {
 			break
 		}
-		start := edge.segments[i] + canvas_start
-		end := point + canvas_start
+		switch segment.type {
+		case .Point:
+			color = edge_color
+		case .Bridge:
+			color = {0, 0, 0, 0}
+		}
+		start := edge.segments[i].end + canvas_start
+		end := segment.end + canvas_start
 		rl.DrawLineEx(start, end, 1, color)
 		last = i
 	}
 
-	draw_arrow(edge.segments[last + 1] + canvas_start, edge.arrow_direction, color)
+	draw_arrow(
+		edge.segments[last + 1].end + canvas_start,
+		edge.arrow_direction,
+		color,
+	)
 }
 
 draw_arrow :: proc(pos: Vec2, direction: gl.ArrowDirection, color: rl.Color) {
@@ -367,5 +407,10 @@ draw_rect :: proc(x, y, w, h: f32, color: clay.Color) {
 
 @(private = "file")
 draw_rect_rounded :: proc(x, y, w, h: f32, radius: f32, color: clay.Color) {
-	rl.DrawRectangleRounded({x, y, w, h}, radius, 8, clay_color_to_rl_color(color))
+	rl.DrawRectangleRounded(
+		{x, y, w, h},
+		radius,
+		8,
+		clay_color_to_rl_color(color),
+	)
 }

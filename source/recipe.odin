@@ -269,7 +269,7 @@ recipe_create_from_pasted :: proc() {
 				gl.id(edge.to),
 			)
 			segments := make(
-				[dynamic]Vec2,
+				[dynamic]gl.Segment,
 				0,
 				len(result.segments),
 				allocator = g.recipe_allocator,
@@ -277,12 +277,9 @@ recipe_create_from_pasted :: proc() {
 
 			assert(ok, "Failed to read edge to position")
 			for segment in result.segments {
-				switch x in segment {
-				case gl.Point:
-					append(&segments, x.end)
-				case gl.Bridge:
-				}
+				append(&segments, segment)
 			}
+			fmt.println(edge, segments)
 			edge.segments = segments[:]
 			edge.arrow_direction = result.arrow_direction
 		}

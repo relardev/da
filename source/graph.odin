@@ -43,7 +43,7 @@ Edge :: struct {
 	from:            NodeHandle,
 	to:              NodeHandle,
 	// filled by graph layouting
-	segments:        []Vec2, // points in pixels
+	segments:        []gl.Segment, // points in pixels
 	arrow_direction: gl.ArrowDirection,
 }
 
