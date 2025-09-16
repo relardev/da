@@ -993,46 +993,46 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 			return {0, 0}, false
 		}
 
-		for &edge, edge_offset in graph.edges {
-			node_from := &graph.nodes[edge.from]
-			for i := 1; i < len(edge.segments); i += 1 {
-				segment := &edge.segments[i]
-				if segment^ == {} {
-					break
+		for &edge_a, edge_a_offset in graph.edges {
+			node_a := &graph.nodes[edge_a.from]
+			for &edge_b in graph.edges[edge_a_offset + 1:] {
+				from_node_b := &graph.nodes[edge_b.from]
+				if from_node_b == node_a {
+					continue
 				}
-				prev_segment := &edge.segments[i - 1]
-				for &edge_candidate in graph.edges[edge_offset + 1:] {
-					from_node_candidate := &graph.nodes[edge_candidate.from]
-					if from_node_candidate == node_from {
-						continue
+				for i := 1; i < len(edge_a.segments); i += 1 {
+					segment_a := &edge_a.segments[i]
+					if segment_a^ == {} {
+						break
 					}
-					for j := 1; j < len(edge_candidate.segments); j += 1 {
-						segment_candidate := &edge_candidate.segments[j]
-						if segment_candidate^ == {} {
+					prev_segment_a := &edge_a.segments[i - 1]
+					for j := 1; j < len(edge_b.segments); j += 1 {
+						segment_b := &edge_b.segments[j]
+						if segment_b^ == {} {
 							break
 						}
-						prev_segment_candidate := &edge_candidate.segments[j - 1]
+						prev_segment_b := &edge_b.segments[j - 1]
 
 						cross, didCross := crossingPoint(
-							prev_segment.end,
-							segment.end,
-							prev_segment_candidate.end,
-							segment_candidate.end,
+							prev_segment_a.end,
+							segment_a.end,
+							prev_segment_b.end,
+							segment_b.end,
 						)
 						if didCross {
 							idx: int
 							segments_to_insert_bridge_into: []Segment
 
-							if edge_candidate.from < edge.from {
+							if edge_b.from < edge_a.from {
 								idx = i
 								i += 2
 								segments_to_insert_bridge_into =
-								edge.segments[:]
+								edge_a.segments[:]
 							} else {
 								idx = j
 								j += 2
 								segments_to_insert_bridge_into =
-								edge_candidate.segments[:]
+								edge_b.segments[:]
 							}
 
 							prev := &segments_to_insert_bridge_into[idx - 1]
