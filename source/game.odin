@@ -18,6 +18,10 @@ example_last_purchase := #load("../examples/product_purchase.json")
 example_last_purchase2 := #load("../examples/product_purchase_2.json")
 example_test_vertical := #load("../examples/vertical_gutter_test.json")
 example_test_bridge := #load("../examples/bridge.json")
+example_20_5 := #load("../examples/full_20_5.json")
+example_20_10 := #load("../examples/full_20_10.json")
+example_20_15 := #load("../examples/full_20_15.json")
+example_full_20 := #load("../examples/full_20.json")
 
 ZOOM_SPEED: f32 = 0.1
 MIN_ZOOM: f32 = 0.1
@@ -136,77 +140,55 @@ update :: proc() {
 				clipboard_paste()
 			}
 
-			if rl.IsKeyPressed(.F8) {
+			handle_example :: proc(example: []u8) {
 				g.needs_redraw = true
-				mem.copy(
-					&g.pasted[0],
-					raw_data(example_node1),
-					len(example_node1),
-				)
-				g.pasted_len = i32(len(example_node1))
+				mem.copy(&g.pasted[0], raw_data(example), len(example))
+				g.pasted_len = i32(len(example))
 				clipboard_after_paste()
+			}
+
+			if rl.IsKeyPressed(.F8) {
+				handle_example(example_node1)
 			}
 
 			if rl.IsKeyPressed(.F9) {
-				g.needs_redraw = true
-				mem.copy(
-					&g.pasted[0],
-					raw_data(example_node3),
-					len(example_node3),
-				)
-				g.pasted_len = i32(len(example_node3))
-				clipboard_after_paste()
+				handle_example(example_node3)
 			}
 
 			if rl.IsKeyPressed(.F10) {
-				g.needs_redraw = true
-				mem.copy(&g.pasted[0], raw_data(example_big), len(example_big))
-				g.pasted_len = i32(len(example_big))
-				clipboard_after_paste()
+				handle_example(example_big)
 			}
 
 			if rl.IsKeyPressed(.F11) {
-				g.needs_redraw = true
-				mem.copy(
-					&g.pasted[0],
-					raw_data(example_last_purchase),
-					len(example_last_purchase),
-				)
-				g.pasted_len = i32(len(example_last_purchase))
-				clipboard_after_paste()
+				handle_example(example_last_purchase)
 			}
 
 			if rl.IsKeyPressed(.F12) {
-				g.needs_redraw = true
-				mem.copy(
-					&g.pasted[0],
-					raw_data(example_last_purchase2),
-					len(example_last_purchase2),
-				)
-				g.pasted_len = i32(len(example_last_purchase2))
-				clipboard_after_paste()
+				handle_example(example_last_purchase2)
 			}
 
 			if rl.IsKeyPressed(.ONE) {
-				g.needs_redraw = true
-				mem.copy(
-					&g.pasted[0],
-					raw_data(example_test_vertical),
-					len(example_test_vertical),
-				)
-				g.pasted_len = i32(len(example_test_vertical))
-				clipboard_after_paste()
+				handle_example(example_test_vertical)
 			}
 
 			if rl.IsKeyPressed(.TWO) {
-				g.needs_redraw = true
-				mem.copy(
-					&g.pasted[0],
-					raw_data(example_test_bridge),
-					len(example_test_bridge),
-				)
-				g.pasted_len = i32(len(example_test_bridge))
-				clipboard_after_paste()
+				handle_example(example_test_bridge)
+			}
+
+			if rl.IsKeyPressed(.THREE) {
+				handle_example(example_20_5)
+			}
+
+			if rl.IsKeyPressed(.FOUR) {
+				handle_example(example_20_10)
+			}
+
+			if rl.IsKeyPressed(.FIVE) {
+				handle_example(example_20_15)
+			}
+
+			if rl.IsKeyPressed(.SIX) {
+				handle_example(example_full_20)
 			}
 
 			if rl.IsKeyPressed(.N) {

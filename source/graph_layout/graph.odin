@@ -14,6 +14,8 @@ gutter_padding :: 40.0 // padding around gutters
 node_landing_padding :: 10.0 // padding for node side where edge arrows can "land"
 bridge_gap :: 5.0 // gap size for edge crossings, whole gap will be 2*bridge_gap
 
+max_segments_per_edge :: 256
+
 // GRAPH_X_ALGORITHM :: "naive"
 GRAPH_X_ALGORITHM :: "barycenter"
 
@@ -54,7 +56,7 @@ Edge :: struct {
 	from:            NodeOffset, // 2 bytes
 	to:              NodeOffset, // 2 bytes
 	// TODO use small array
-	segments:        [64]Segment,
+	segments:        [max_segments_per_edge]Segment,
 	arrow_direction: ArrowDirection,
 }
 
@@ -421,7 +423,7 @@ graph_read_edge :: proc(
 
 	for &edge in graph.edges {
 		if edge.from == from_offset && edge.to == to_offset {
-			first_zero := 64
+			first_zero := max_segments_per_edge
 			for segment, i in edge.segments {
 				if segment == {} {
 					first_zero = i
@@ -1046,7 +1048,6 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 								} else { 	// going up
 									start = cross + {0, bridge_gap}
 									end = cross + {0, -bridge_gap}
-									panic("Edges should not go up")
 								}
 							} else {
 								if prev.end.x < next.end.x { 	// going right
