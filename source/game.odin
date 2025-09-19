@@ -22,6 +22,7 @@ example_20_5 := #load("../examples/full_20_5.json")
 example_20_10 := #load("../examples/full_20_10.json")
 example_20_15 := #load("../examples/full_20_15.json")
 example_full_20 := #load("../examples/full_20.json")
+example_vertical_20 := #load("../examples/vertical_20.json")
 
 ZOOM_SPEED: f32 = 0.1
 MIN_ZOOM: f32 = 0.1
@@ -189,6 +190,10 @@ update :: proc() {
 
 			if rl.IsKeyPressed(.SIX) {
 				handle_example(example_full_20)
+			}
+
+			if rl.IsKeyPressed(.SEVEN) {
+				handle_example(example_vertical_20)
 			}
 
 			if rl.IsKeyPressed(.N) {

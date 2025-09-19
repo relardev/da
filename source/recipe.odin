@@ -279,7 +279,10 @@ recipe_create_from_pasted :: proc() {
 			for segment in result.segments {
 				append(&segments, segment)
 			}
-			fmt.println(edge, segments)
+			fmt.println("Edge from ", edge.from, " to ", edge.to)
+			for segment in segments {
+				fmt.println(segment.type, "\t", segment.end)
+			}
 			edge.segments = segments[:]
 			edge.arrow_direction = result.arrow_direction
 		}

@@ -3,13 +3,14 @@ package graph_layout
 import "base:runtime"
 import "core:fmt"
 import "core:log"
+import "core:math"
 import "core:mem"
 import "core:slice"
 import ts "topological_sort"
 
 _ :: log
 
-gutter_edge_distance :: 10.0 // distance between edges in gutters
+gutter_edge_distance :: 20.0 // distance between edges in gutters
 gutter_padding :: 40.0 // padding around gutters
 node_landing_padding :: 10.0 // padding for node side where edge arrows can "land"
 bridge_gap :: 5.0 // gap size for edge crossings, whole gap will be 2*bridge_gap
@@ -457,7 +458,7 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 	)
 
 	for node, i in graph.nodes {
-		if i == 0 {
+		if i == 0 { 	// skip zero-node
 			continue
 		}
 		// log.info("Adding node to sorter: ", node.offset, " - ", node.name)
@@ -484,8 +485,10 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 	}
 
 	layers := make(Layers, nodes_count, allocator = graph.allocator)
+	mark_memory_used(graph, raw_data(layers), "Layers")
 
 	y_max: i32 = 0
+
 	predecessor_list := make(
 		[dynamic]NodeOffset,
 		0,
@@ -493,6 +496,7 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 		allocator = graph.allocator,
 	)
 	mark_memory_used(graph, raw_data(predecessor_list), "Predecessors")
+
 	for node_offset in nodes_sorted {
 		max_prev: i32 = 0
 		graph_fill_predecessors_of(graph, node_offset, &predecessor_list)
@@ -664,18 +668,23 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 
 			// Horizontal
 			{
-				horizontal := from_node.position.y + 1
-				horizontal_edges := &graph.gutters_horizontal[horizontal].edges
-				append(horizontal_edges, EdgeOffset(i))
+				horizontal_gutter_idx := from_node.position.y + 1
+				horizontal_edges := &graph.gutters_horizontal[horizontal_gutter_idx].edges
+				found := false
+				for horizontal_edge_idx in horizontal_edges {
+					horizontal_edge := &graph.edges[horizontal_edge_idx]
+					if horizontal_edge.from == edge.from {
+						found = true
+						break
+					}
+				}
+				if !found {
+					append(horizontal_edges, EdgeOffset(i))
+				}
 			}
 
 			// Vertical
 			{
-				if from_node.position.y + 1 == to_node.position.y &&
-				   from_node.position.x == to_node.position.x {
-					continue // dont use vertical gutter if the edges are on adjecent rows
-				}
-
 				vertical_gutter_idx: int
 				if from_node.position.x == to_node.position.x {
 					vertical_gutter_idx = int(from_node.position.x)
@@ -1040,6 +1049,24 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 							prev := &segments_to_insert_bridge_into[idx - 1]
 							next := &segments_to_insert_bridge_into[idx]
 
+							if prev.end == next.end {
+								panic("Overlapping segments not supported")
+							}
+
+							if next.type == .Bridge {
+								continue
+							}
+
+							distance := math.sqrt(
+								math.pow(prev.end.x - next.end.x, 2) +
+								math.pow(prev.end.y - next.end.y, 2),
+							)
+
+							if distance < 2 * bridge_gap &&
+							   prev.type == .Bridge {
+								panic("Bridges too close")
+							}
+
 							start, end: V2
 							if isVertical(prev.end, next.end) {
 								if prev.end.y < next.end.y { 	// going down
@@ -1048,6 +1075,7 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 								} else { 	// going up
 									start = cross + {0, bridge_gap}
 									end = cross + {0, -bridge_gap}
+									panic("Upward edges not supported")
 								}
 							} else {
 								if prev.end.x < next.end.x { 	// going right
@@ -1058,6 +1086,7 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 									end = cross + {-bridge_gap, 0}
 								}
 							}
+
 							inserted := insertBridge(
 								segments_to_insert_bridge_into,
 								idx,
