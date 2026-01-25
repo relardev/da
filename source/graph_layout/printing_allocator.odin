@@ -3,6 +3,8 @@ package graph_layout
 import "core:fmt"
 import "core:mem"
 
+_ :: mem
+
 print_allocator :: proc(allocator: ^mem.Allocator) -> mem.Allocator {
 	return mem.Allocator{procedure = print_allocator_proc, data = allocator}
 }

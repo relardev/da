@@ -4,6 +4,8 @@ import "core:fmt"
 import "core:mem"
 import "core:testing"
 
+_ :: mem
+
 @(test)
 test_allocation_needed_constant_memory :: proc(t: ^testing.T) {
 	tests := []struct {

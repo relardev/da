@@ -5,6 +5,8 @@ import "core:fmt"
 import "core:mem"
 import "core:testing"
 
+_ :: mem
+
 @(test)
 test_optimal_assign_quadratic :: proc(t: ^testing.T) {
 
@@ -191,9 +193,7 @@ test_optimal_assign_quadratic :: proc(t: ^testing.T) {
 		},
 	}
 	for tt in tests {
-		bytes, alignment := optimal_assign_quadratic_allocation_needed(
-			len(tt.layer),
-		)
+		bytes, _ := optimal_assign_quadratic_allocation_needed(len(tt.layer))
 
 		buffer := make([]byte, bytes)
 		defer delete(buffer)
