@@ -43,6 +43,7 @@ Node :: struct {
 	external_id: ExternalID,
 	in_edges:    EdgeHandle,
 	out_edges:   EdgeHandle,
+	layer:       u16,
 }
 
 Edge :: struct {
@@ -176,8 +177,8 @@ graph_edge_add :: proc(g: ^Graph, from_id, to_id: ExternalID) -> bool {
 		dst = dst_id,
 	}
 
-	{
-		src := node_get(g, src_id)
+	src := node_get(g, src_id)
+	{ 	// Link in source node.
 		if src.out_edges == {} {
 			// First out edge.
 			new_edge.src_next = edge_id
@@ -196,8 +197,9 @@ graph_edge_add :: proc(g: ^Graph, from_id, to_id: ExternalID) -> bool {
 		}
 	}
 
-	{
+	{ 	// Link in destination node.
 		dst := node_get(g, dst_id)
+		dst.layer = max(dst.layer, src.layer + 1)
 		if dst.in_edges == {} {
 			// First in edge.
 			new_edge.dst_next = edge_id
@@ -322,12 +324,13 @@ print_state :: proc(indent: int, g: ^Graph, name: string) {
 		for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
 			node := g.nodes[i]
 			fmt.printf(
-				"%*sNode[%d] id:%d eid:%d: in_edges=%d, out_edges=%d\n",
+				"%*sNode[%d] id:%d eid:%d, layer:%d in_edges=%d, out_edges=%d\n",
 				2 * (indent + 1),
 				"",
 				i,
 				node.id.offset,
 				node.external_id,
+				node.layer,
 				node.in_edges.offset,
 				node.out_edges.offset,
 			)
