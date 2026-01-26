@@ -1037,13 +1037,11 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 							if edge_b.from < edge_a.from {
 								idx = i
 								i += 2
-								segments_to_insert_bridge_into =
-								edge_a.segments[:]
+								segments_to_insert_bridge_into = edge_a.segments[:]
 							} else {
 								idx = j
 								j += 2
-								segments_to_insert_bridge_into =
-								edge_b.segments[:]
+								segments_to_insert_bridge_into = edge_b.segments[:]
 							}
 
 							prev := &segments_to_insert_bridge_into[idx - 1]
