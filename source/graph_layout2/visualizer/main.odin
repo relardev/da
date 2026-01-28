@@ -297,10 +297,14 @@ add_graph1 :: proc(graphs: ^[dynamic][2]Graph) {
 add_graph2 :: proc(graphs: ^[dynamic][2]Graph) {
 	nodes := [?]Node{{id = 34}, {id = 23}, {id = 12}, {id = 41}}
 	edges := [?]Edge {
-		{from = 12, to = 23},
 		{from = 23, to = 34},
 		{from = 34, to = 41},
+		{from = 12, to = 23},
 	}
+	//{id = 23},
+	//{id = 34},
+	//{id = 12},
+	//{id = 41}
 
 	graph_fill(graphs, nodes[:], edges[:])
 }

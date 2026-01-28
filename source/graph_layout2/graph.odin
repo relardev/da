@@ -4,6 +4,7 @@ import "base:runtime"
 import "core:fmt"
 import "core:log"
 import "core:mem"
+import "core:sort"
 import ts "topological_sort"
 
 _ :: log
@@ -43,7 +44,12 @@ Node :: struct {
 	external_id: ExternalID,
 	in_edges:    EdgeHandle,
 	out_edges:   EdgeHandle,
+
+	// layer assignment
+	stack_next:  NodeHandle,
+	stack_prev:  NodeHandle,
 	layer:       u16,
+	row:         u16,
 }
 
 Edge :: struct {
@@ -139,7 +145,7 @@ graph_node_read :: proc(g: ^Graph, id: ExternalID) -> (V2, bool) {
 
 	node := g.nodes[node_id.offset]
 
-	return {0, f32(100 * node.id.offset)}, true
+	return {f32(150 * node.row), f32(150 * node.layer)}, true
 }
 
 graph_edge_add :: proc(g: ^Graph, from_id, to_id: ExternalID) -> bool {
@@ -159,12 +165,9 @@ graph_edge_add :: proc(g: ^Graph, from_id, to_id: ExternalID) -> bool {
 		return false
 	}
 
-	// topological sort
+	// start topological sort
 	if src_id.offset > dst_id.offset {
-		print_state(1, g, "BEFORE")
-		fmt.println("SWAP ", from_id, " <-> ", to_id)
 		swap(g, &src_id, &dst_id)
-		print_state(1, g, "AFTER")
 	}
 
 	edge_id := EdgeHandle {
@@ -199,7 +202,6 @@ graph_edge_add :: proc(g: ^Graph, from_id, to_id: ExternalID) -> bool {
 
 	{ 	// Link in destination node.
 		dst := node_get(g, dst_id)
-		dst.layer = max(dst.layer, src.layer + 1)
 		if dst.in_edges == {} {
 			// First in edge.
 			new_edge.dst_next = edge_id
@@ -243,9 +245,149 @@ graph_segment_read :: proc(
 }
 
 graph_layout_compute :: proc(g: ^Graph) {
+	// ------ ASSIGN LAYERS ------
 	print_state(0, g, "COMPUE")
 
-	return
+	for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
+		node_layer1 := &g.nodes[i]
+		if node_layer1.in_edges != {} {
+			continue
+		}
+
+		fmt.println("starting tree walk for node ", node_layer1.id.offset, i)
+
+		stack_top: #soa^#soa[dynamic]Node = nil
+		node_stack_push(&stack_top, node_layer1)
+
+		for { 	// go through stack of edges
+			node := node_stack_pop(g, &stack_top)
+			if node == nil {
+				fmt.println(
+					"done with tree walk for node ",
+					node_layer1.id.offset,
+					i,
+				)
+				break
+			}
+
+			if node.out_edges == {} {
+				fmt.println(
+					"node ",
+					node.id.offset,
+					" has no out edges, skipping",
+				)
+				continue
+			}
+
+			start_edge := edge_get(g, node.out_edges)
+			fmt.println(
+				"processing out edges for node ",
+				node.id.offset,
+				", starting with edge ",
+				start_edge.id.offset,
+			)
+			edge := start_edge
+			for {
+				fmt.println(
+					"  processing edge ",
+					edge.id.offset,
+					" to node ",
+					edge.dst.offset,
+				)
+				next_node := node_get(g, edge.dst)
+				next_node.layer = max(next_node.layer, node.layer + 1)
+				node_stack_push(&stack_top, next_node)
+
+				fmt.println(
+					"    setting node ",
+					next_node.id.offset,
+					" to layer ",
+					next_node.layer,
+				)
+
+				edge = edge_get(g, edge.src_next)
+				if edge.id == start_edge.id {
+					break
+				}
+			}
+		}
+	}
+
+	// ------- FINISH SORTING USING LAYERS ------
+
+	si := sort.Interface {
+		len = proc(it: sort.Interface) -> int {
+			g := (^Graph)(it.collection)
+			return len(g.nodes)
+		},
+		swap = proc(it: sort.Interface, a, b: int) {
+			g := (^Graph)(it.collection)
+			nodes := &g.nodes
+			ah := nodes[a].id
+			bh := nodes[b].id
+			swap(g, &ah, &bh)
+		},
+		less = proc(it: sort.Interface, a, b: int) -> bool {
+			g := (^Graph)(it.collection)
+			return g.nodes[a].layer < g.nodes[b].layer
+		},
+		collection = g,
+	}
+
+	sort.sort(si)
+
+	// ------ ASSIGN ROWS ------
+
+	row: u16 = 0
+	last_layer: u16 = 0
+	for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
+		node := &g.nodes[i]
+		if node.layer != last_layer {
+			last_layer = node.layer
+			row = 0
+		}
+		node.row = row
+		row += 1
+	}
+
+
+	print_state(0, g, "COMPUE END")
+
+}
+
+node_stack_push :: proc(
+	stack_top: ^#soa^#soa[dynamic]Node,
+	new_node: #soa^#soa[dynamic]Node,
+) {
+	if stack_top^ == nil {
+		new_node.stack_prev = {}
+		new_node.stack_next = {}
+	} else {
+		stack_top^.stack_next = new_node.id
+		new_node.stack_prev = stack_top^.id
+	}
+	stack_top^ = new_node
+}
+
+node_stack_pop :: proc(
+	g: ^Graph,
+	stack_top: ^#soa^#soa[dynamic]Node,
+) -> #soa^#soa[dynamic]Node {
+	popped := stack_top^
+	if popped == nil {
+		fmt.println("stack is empty, cannot pop")
+		return nil
+	}
+
+	if popped.stack_prev == {} {
+		// Stack is now empty.
+		stack_top^ = nil
+	} else {
+		stack_top^ = node_get(g, popped.stack_prev)
+		stack_top^.stack_next = {}
+	}
+
+	return popped
 }
 
 swap :: proc(g: ^Graph, ah: ^NodeHandle, bh: ^NodeHandle) {
@@ -324,12 +466,13 @@ print_state :: proc(indent: int, g: ^Graph, name: string) {
 		for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
 			node := g.nodes[i]
 			fmt.printf(
-				"%*sNode[%d] id:%d eid:%d, layer:%d in_edges=%d, out_edges=%d\n",
+				"%*sNode[%d] id:%d eid:%d, row:%d layer:%d in_edges=%d, out_edges=%d\n",
 				2 * (indent + 1),
 				"",
 				i,
 				node.id.offset,
 				node.external_id,
+				node.row,
 				node.layer,
 				node.in_edges.offset,
 				node.out_edges.offset,
