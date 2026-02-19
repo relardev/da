@@ -4,6 +4,7 @@ import gl2 "../"
 import gl "../../graph_layout/"
 import "base:runtime"
 import "core:fmt"
+import "core:strings"
 import rl "vendor:raylib"
 
 _ :: gl
@@ -11,12 +12,16 @@ _ :: gl2
 
 V2 :: [2]f32
 
+DEBUG_SECTION_START :: V2{1000, 300}
+DebugDrawSectionOrigin := DEBUG_SECTION_START
+
+DEBUG_Y_OFFSET :: 100
+DebugDrawMaxY: f32 = 0
 
 Node :: struct {
 	id:  int,
 	rec: rl.Rectangle,
 }
-
 
 Edge :: struct {
 	from:     int,
@@ -59,6 +64,10 @@ main :: proc() {
 		graph_pair := &graphs[graph_selector]
 		graph_1 := &graph_pair[0]
 		graph_2 := &graph_pair[1]
+
+		rl.BeginDrawing()
+		DebugDrawSectionOrigin = DEBUG_SECTION_START
+		DebugDrawMaxY = 0
 
 		{
 			g := graph_1
@@ -135,6 +144,41 @@ main :: proc() {
 		}
 
 		{
+			debug_draw_rect :: proc(
+				pos: V2,
+				size: V2,
+				color: [4]u8,
+				text: string,
+			) {
+				orig := DebugDrawSectionOrigin
+				rl.DrawRectangleV(orig + pos, size, transmute(rl.Color)color)
+				rl.DrawText(
+					strings.clone_to_cstring(text),
+					i32(orig.x + pos[0] + size[0] / 4),
+					i32(orig.y + pos[1] + size[1] / 4),
+					20,
+					rl.WHITE,
+				)
+
+				DebugDrawMaxY = max(DebugDrawMaxY, pos[1] + size[1])
+			}
+
+			debug_section :: proc(name: string) {
+				orig := DebugDrawSectionOrigin
+
+				DebugDrawSectionOrigin = orig + V2{0, DebugDrawMaxY + 20}
+				DebugDrawMaxY = 0
+
+				rl.DrawText(
+					strings.clone_to_cstring(name),
+					i32(orig.x),
+					i32(orig.y - 30),
+					30,
+					rl.BLACK,
+				)
+				rl.DrawLineV(orig, orig + V2{1200, 0}, rl.BLACK)
+			}
+
 			g := graph_2
 			graph: gl2.Graph
 			gl2.graph_init(
@@ -143,6 +187,8 @@ main :: proc() {
 				u16(len(g.edges)),
 				max_node_size,
 				context.allocator,
+				debug_draw_rect = debug_draw_rect,
+				debug_new_section = debug_section,
 			)
 
 			for node in g.nodes {
@@ -216,7 +262,6 @@ main :: proc() {
 			}
 		}
 
-		rl.BeginDrawing()
 		draw(graph_pair)
 		rl.EndDrawing()
 	}

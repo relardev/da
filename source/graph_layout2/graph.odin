@@ -25,6 +25,8 @@ Graph :: struct {
 	segments:            #soa[dynamic]Segment,
 	external_id_to_node: map[ExternalID]NodeHandle,
 	node_size:           V2,
+	debug_draw_rect:     proc(pos: V2, size: V2, color: [4]u8, text: string),
+	debug_new_section:   proc(name: string),
 }
 
 EdgeHandle :: struct {
@@ -49,7 +51,9 @@ Node :: struct {
 	stack_next:  NodeHandle,
 	stack_prev:  NodeHandle,
 	layer:       u16,
-	row:         u16,
+
+	// columns
+	column:      u16,
 }
 
 Edge :: struct {
@@ -91,6 +95,8 @@ graph_init :: proc(
 	edge_capacity: u16,
 	node_size: V2,
 	allocator: mem.Allocator,
+	debug_draw_rect: proc(pos: V2, size: V2, color: [4]u8, text: string) = nil,
+	debug_new_section: proc(name: string) = nil,
 ) {
 	nil_alloc := mem.nil_allocator()
 	g.nodes = make(#soa[dynamic]Node, 0, node_capacity + 2, allocator)
@@ -119,6 +125,9 @@ graph_init :: proc(
 	g.external_id_to_node.allocator = nil_alloc
 
 	g.node_size = node_size
+
+	g.debug_draw_rect = debug_draw_rect
+	g.debug_new_section = debug_new_section
 }
 
 graph_node_add :: proc(g: ^Graph, id: ExternalID) -> bool {
@@ -145,7 +154,7 @@ graph_node_read :: proc(g: ^Graph, id: ExternalID) -> (V2, bool) {
 
 	node := g.nodes[node_id.offset]
 
-	return {f32(150 * node.row), f32(150 * node.layer)}, true
+	return {f32(150 * node.column), f32(150 * node.layer)}, true
 }
 
 graph_edge_add :: proc(g: ^Graph, from_id, to_id: ExternalID) -> bool {
@@ -246,6 +255,8 @@ graph_segment_read :: proc(
 
 graph_layout_compute :: proc(g: ^Graph) {
 	// ------ ASSIGN LAYERS ------
+	debug_draw_section(g, "Assign Layers")
+	debug_draw_nodes_order(g)
 	print_state(0, g, "COMPUE")
 
 	for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
@@ -338,18 +349,20 @@ graph_layout_compute :: proc(g: ^Graph) {
 
 	// ------ ASSIGN ROWS ------
 
-	row: u16 = 0
+	column: u16 = 0
 	last_layer: u16 = 0
 	for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
 		node := &g.nodes[i]
 		if node.layer != last_layer {
 			last_layer = node.layer
-			row = 0
+			column = 0
 		}
-		node.row = row
-		row += 1
+		node.column = column
+		column += 1
 	}
 
+	// debug_draw_section(g, "END")
+	debug_draw_nodes_split_by_layer(g, base_y = 200)
 
 	print_state(0, g, "COMPUE END")
 
@@ -461,6 +474,7 @@ print_state :: proc(indent: int, g: ^Graph, name: string) {
 			fmt.print("  ")
 		}
 	}
+
 	when DEBUG {
 		fmt.printf("%*s------ %s ------\n", 2 * indent, "", name)
 		for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
@@ -472,7 +486,7 @@ print_state :: proc(indent: int, g: ^Graph, name: string) {
 				i,
 				node.id.offset,
 				node.external_id,
-				node.row,
+				node.column,
 				node.layer,
 				node.in_edges.offset,
 				node.out_edges.offset,
@@ -495,5 +509,61 @@ print_state :: proc(indent: int, g: ^Graph, name: string) {
 				edge.dst_prev.offset,
 			)
 		}
+	}
+}
+
+debug_draw_nodes_order :: proc(g: ^Graph, base_y: f32 = 0) {
+	for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
+		node := g.nodes[i]
+		pos := V2{f32(100 * i), base_y}
+		g.debug_draw_rect(
+			pos,
+			{f32(80), f32(80)},
+			[4]u8{0, 255, 0, 255},
+			fmt.tprintf("n%d", i),
+		)
+	}
+}
+
+debug_draw_nodes_split_by_layer :: proc(g: ^Graph, base_y: f32 = 0) {
+	row := 0
+	x_offset := 0
+	prev := g.nodes[0]
+	for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
+		curr := g.nodes[i]
+		if prev.layer != curr.layer {
+			row += 1
+			x_offset = 0
+		} else {
+			x_offset += 100
+		}
+		prev = curr
+
+		pos := V2{20 + f32(x_offset), base_y + 20 + f32(100 * row)}
+
+		fmt.println(pos)
+		g.debug_draw_rect(
+			pos,
+			{f32(80), f32(80)},
+			[4]u8{0, 0, 255, 255},
+			fmt.tprintf("x%d", i),
+		)
+	}
+}
+
+debug_draw_section :: proc(g: ^Graph, name: string) {
+	when DEBUG {
+		g.debug_new_section(name)
+	}
+}
+debug_draw_rect :: proc(
+	g: ^Graph,
+	pos: V2,
+	size: V2,
+	color: [4]u8,
+	text: string,
+) {
+	when DEBUG {
+		g.debug_draw_rect(pos, size, color, text)
 	}
 }
