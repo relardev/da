@@ -48,10 +48,11 @@ Graph :: struct {
 
 main :: proc() {
 	rl.InitWindow(2000, 1200, "graph viz")
-	max_node_size := V2{100, 50}
+	max_node_size := V2{50, 50}
 
 	graphs := make([dynamic][2]Graph, 0)
 
+	add_graph_full_20_5(&graphs)
 	add_graph3(&graphs)
 	add_graph1(&graphs)
 	add_graph2(&graphs)
@@ -393,6 +394,38 @@ add_graph3 :: proc(graphs: ^[dynamic][2]Graph) {
 		{from = 5, to = 6},
 		{from = 7, to = 8},
 		{from = 8, to = 9},
+	}
+
+	graph_fill(graphs, nodes[:], edges[:], 400)
+}
+
+// example_20_5 := #load("../examples/full_20_5.json")
+add_graph_full_20_5 :: proc(graphs: ^[dynamic][2]Graph) {
+	nodes := [?]Node {
+		// Layer 0: 1 node
+		{id = 0},
+		// Layer 1: 3 nodes
+		{id = 1},
+		{id = 2},
+		{id = 3},
+		// Layer 2: 5 nodes
+		{id = 4},
+		{id = 5},
+		{id = 6},
+		{id = 7},
+		{id = 8},
+	}
+	edges := [?]Edge {
+		// Layer 0 -> Layer 1
+		{from = 0, to = 1},
+		{from = 0, to = 2},
+		{from = 0, to = 3},
+		// Layer 1 -> Layer 2
+		{from = 1, to = 4},
+		{from = 1, to = 5},
+		{from = 2, to = 6},
+		{from = 3, to = 7},
+		{from = 3, to = 8},
 	}
 
 	graph_fill(graphs, nodes[:], edges[:], 400)
