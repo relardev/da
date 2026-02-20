@@ -12,11 +12,10 @@ _ :: gl2
 
 V2 :: [2]f32
 
-DEBUG_SECTION_START :: V2{1000, 300}
+DEBUG_SECTION_START :: V2{1000, 0}
 DebugDrawSectionOrigin := DEBUG_SECTION_START
 
-DEBUG_PADDING :: 20
-DEBUG_Y_OFFSET :: 100
+DEBUG_PADDING :: 5
 DebugDrawMaxY: f32 = 0
 
 Node :: struct {
@@ -42,8 +41,9 @@ SegmentType :: enum {
 }
 
 Graph :: struct {
-	nodes: []Node,
-	edges: []Edge,
+	nodes:    []Node,
+	edges:    []Edge,
+	y_offset: f32,
 }
 
 main :: proc() {
@@ -52,6 +52,7 @@ main :: proc() {
 
 	graphs := make([dynamic][2]Graph, 0)
 
+	add_graph3(&graphs)
 	add_graph1(&graphs)
 	add_graph2(&graphs)
 
@@ -67,7 +68,8 @@ main :: proc() {
 		graph_2 := &graph_pair[1]
 
 		rl.BeginDrawing()
-		DebugDrawSectionOrigin = DEBUG_SECTION_START
+
+		DebugDrawSectionOrigin = DEBUG_SECTION_START + V2{0, graph_2.y_offset}
 		DebugDrawMaxY = 0
 
 		{
@@ -152,15 +154,12 @@ main :: proc() {
 				text: string,
 			) {
 				orig := DebugDrawSectionOrigin
-				rl.DrawRectangleV(
-					orig + pos + 20,
-					size,
-					transmute(rl.Color)color,
-				)
+				upper_left := orig + pos + DEBUG_PADDING
+				rl.DrawRectangleV(upper_left, size, transmute(rl.Color)color)
 				rl.DrawText(
 					strings.clone_to_cstring(text),
-					i32(orig.x + pos[0] + size[0] / 4),
-					i32(orig.y + pos[1] + size[1] / 4),
+					i32(upper_left.x) + 5,
+					i32(upper_left.y) + 5,
 					20,
 					rl.WHITE,
 				)
@@ -311,7 +310,12 @@ draw_graph :: proc(g: ^Graph, start_width: f32 = 0) {
 	}
 }
 
-graph_fill :: proc(graphs: ^[dynamic][2]Graph, nodes: []Node, edges: []Edge) {
+graph_fill :: proc(
+	graphs: ^[dynamic][2]Graph,
+	nodes: []Node,
+	edges: []Edge,
+	y_offset: f32 = 0,
+) {
 	nodes_gl := make([]Node, len(nodes))
 	copy_slice(nodes_gl, nodes[:])
 
@@ -319,8 +323,9 @@ graph_fill :: proc(graphs: ^[dynamic][2]Graph, nodes: []Node, edges: []Edge) {
 	copy_slice(edges_gl, edges[:])
 
 	graph_gl := Graph {
-		nodes = nodes_gl[:],
-		edges = edges_gl[:],
+		nodes    = nodes_gl[:],
+		edges    = edges_gl[:],
+		y_offset = y_offset,
 	}
 
 	nodes_gl2 := make([]Node, len(nodes))
@@ -330,8 +335,9 @@ graph_fill :: proc(graphs: ^[dynamic][2]Graph, nodes: []Node, edges: []Edge) {
 	copy_slice(edges_gl2, edges[:])
 
 	graph_gl2 := Graph {
-		nodes = nodes_gl2[:],
-		edges = edges_gl2[:],
+		nodes    = nodes_gl2[:],
+		edges    = edges_gl2[:],
+		y_offset = y_offset,
 	}
 	append(graphs, [2]Graph{graph_gl, graph_gl2})
 }
@@ -345,7 +351,7 @@ add_graph1 :: proc(graphs: ^[dynamic][2]Graph) {
 		{from = 2, to = 4},
 	}
 
-	graph_fill(graphs, nodes[:], edges[:])
+	graph_fill(graphs, nodes[:], edges[:], 300)
 }
 
 add_graph2 :: proc(graphs: ^[dynamic][2]Graph) {
@@ -360,5 +366,29 @@ add_graph2 :: proc(graphs: ^[dynamic][2]Graph) {
 	//{id = 12},
 	//{id = 41}
 
-	graph_fill(graphs, nodes[:], edges[:])
+	graph_fill(graphs, nodes[:], edges[:], 600)
+}
+
+add_graph3 :: proc(graphs: ^[dynamic][2]Graph) {
+	nodes := [?]Node {
+		{id = 1},
+		{id = 2},
+		{id = 3},
+		{id = 4},
+		{id = 5},
+		{id = 6},
+		{id = 7},
+		{id = 8},
+		{id = 9},
+	}
+	edges := [?]Edge {
+		{from = 1, to = 2},
+		{from = 2, to = 3},
+		{from = 4, to = 5},
+		{from = 5, to = 6},
+		{from = 7, to = 8},
+		{from = 8, to = 9},
+	}
+
+	graph_fill(graphs, nodes[:], edges[:], 400)
 }

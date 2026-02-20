@@ -347,7 +347,7 @@ graph_layout_compute :: proc(g: ^Graph) {
 
 	sort.sort(si)
 
-	// ------ ASSIGN ROWS ------
+	// ------ ASSIGN SOME COLUMNS ------
 
 	column: u16 = 0
 	last_layer: u16 = 0
@@ -361,7 +361,14 @@ graph_layout_compute :: proc(g: ^Graph) {
 		column += 1
 	}
 
-	debug_draw_section(g, "END")
+	debug_draw_section(g, "before")
+	debug_draw_nodes_split_by_layer(g)
+
+	// ------ ASSIGN PROPER COLUMNS ------
+
+	assign_columns(g)
+
+	debug_draw_section(g, "after")
 	debug_draw_nodes_split_by_layer(g)
 
 	print_state(0, g, "COMPUE END")
@@ -512,22 +519,42 @@ print_state :: proc(indent: int, g: ^Graph, name: string) {
 	}
 }
 
+assign_columns :: proc(g: ^Graph) {
+	// TODO
+}
+
+DEBUG_RECT_SIDE :: 40
+DEBUG_PADDING :: 10
+DEBUG_RECT_SIZE: V2 = {DEBUG_RECT_SIDE, DEBUG_RECT_SIDE}
+
 debug_draw_nodes_order :: proc(g: ^Graph, base_y: f32 = 0) {
+	when !DEBUG {
+		return
+	}
+
+	dist_between_rects :: DEBUG_RECT_SIDE + DEBUG_PADDING
+
 	for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
 		node := g.nodes[i]
-		pos := V2{f32(100 * i), base_y}
+		pos := V2{dist_between_rects * f32(i), base_y}
 		g.debug_draw_rect(
 			pos,
-			{f32(80), f32(80)},
+			DEBUG_RECT_SIZE,
 			[4]u8{0, 255, 0, 255},
-			fmt.tprintf("n%d", i),
+			fmt.tprintf("n%d", node.external_id),
 		)
 	}
 }
 
 debug_draw_nodes_split_by_layer :: proc(g: ^Graph, base_y: f32 = 0) {
+	when !DEBUG {
+		return
+	}
+
+	dist_between_rects := DEBUG_RECT_SIDE + DEBUG_PADDING
+
 	row := 0
-	x_offset := -100 // start with -100 so that the first node in a layer is at x=0
+	x_offset := -1 * dist_between_rects
 	prev := g.nodes[0]
 	for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
 		curr := g.nodes[i]
@@ -535,16 +562,16 @@ debug_draw_nodes_split_by_layer :: proc(g: ^Graph, base_y: f32 = 0) {
 			row += 1
 			x_offset = 0
 		} else {
-			x_offset += 100
+			x_offset += dist_between_rects
 		}
 		prev = curr
 
-		pos := V2{f32(x_offset), base_y + f32(100 * row)}
+		pos := V2{f32(x_offset), base_y + f32(dist_between_rects * row)}
 
 		fmt.println(pos)
 		g.debug_draw_rect(
 			pos,
-			{f32(80), f32(80)},
+			DEBUG_RECT_SIZE,
 			[4]u8{0, 0, 255, 255},
 			fmt.tprintf("x%d", i),
 		)
