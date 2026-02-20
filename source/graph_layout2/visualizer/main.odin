@@ -57,10 +57,16 @@ main :: proc() {
 	add_graph2(&graphs)
 
 	graph_selector := 0
+	run_gl_layout := true // Run on first frame
 
 	for !rl.WindowShouldClose() {
 		if rl.IsKeyPressed(.T) {
 			graph_selector = (graph_selector + 1) % len(graphs)
+			run_gl_layout = true
+		}
+
+		if rl.IsKeyPressed(.N) {
+			run_gl_layout = true
 		}
 
 		graph_pair := &graphs[graph_selector]
@@ -72,7 +78,8 @@ main :: proc() {
 		DebugDrawSectionOrigin = DEBUG_SECTION_START + V2{0, graph_2.y_offset}
 		DebugDrawMaxY = 0
 
-		{
+		if run_gl_layout {
+			run_gl_layout = false
 			g := graph_1
 			gl_buffer := runtime.make_aligned([]u8, 64 * 1024 * 1024, 64)
 			gl_graph := gl.graph_new(gl_buffer, len(g.nodes), len(g.edges))
