@@ -15,6 +15,7 @@ V2 :: [2]f32
 DEBUG_SECTION_START :: V2{1000, 300}
 DebugDrawSectionOrigin := DEBUG_SECTION_START
 
+DEBUG_PADDING :: 20
 DEBUG_Y_OFFSET :: 100
 DebugDrawMaxY: f32 = 0
 
@@ -151,7 +152,11 @@ main :: proc() {
 				text: string,
 			) {
 				orig := DebugDrawSectionOrigin
-				rl.DrawRectangleV(orig + pos, size, transmute(rl.Color)color)
+				rl.DrawRectangleV(
+					orig + pos + 20,
+					size,
+					transmute(rl.Color)color,
+				)
 				rl.DrawText(
 					strings.clone_to_cstring(text),
 					i32(orig.x + pos[0] + size[0] / 4),
@@ -160,14 +165,18 @@ main :: proc() {
 					rl.WHITE,
 				)
 
-				DebugDrawMaxY = max(DebugDrawMaxY, pos[1] + size[1])
+				DebugDrawMaxY = max(
+					DebugDrawMaxY,
+					pos[1] + size[1] + DEBUG_PADDING,
+				)
 			}
 
 			debug_section :: proc(name: string) {
-				orig := DebugDrawSectionOrigin
-
-				DebugDrawSectionOrigin = orig + V2{0, DebugDrawMaxY + 20}
+				DebugDrawSectionOrigin =
+					DebugDrawSectionOrigin +
+					V2{0, DebugDrawMaxY + DEBUG_PADDING}
 				DebugDrawMaxY = 0
+				orig := DebugDrawSectionOrigin
 
 				rl.DrawText(
 					strings.clone_to_cstring(name),

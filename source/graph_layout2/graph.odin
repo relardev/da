@@ -361,8 +361,8 @@ graph_layout_compute :: proc(g: ^Graph) {
 		column += 1
 	}
 
-	// debug_draw_section(g, "END")
-	debug_draw_nodes_split_by_layer(g, base_y = 200)
+	debug_draw_section(g, "END")
+	debug_draw_nodes_split_by_layer(g)
 
 	print_state(0, g, "COMPUE END")
 
@@ -527,7 +527,7 @@ debug_draw_nodes_order :: proc(g: ^Graph, base_y: f32 = 0) {
 
 debug_draw_nodes_split_by_layer :: proc(g: ^Graph, base_y: f32 = 0) {
 	row := 0
-	x_offset := 0
+	x_offset := -100 // start with -100 so that the first node in a layer is at x=0
 	prev := g.nodes[0]
 	for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
 		curr := g.nodes[i]
@@ -539,7 +539,7 @@ debug_draw_nodes_split_by_layer :: proc(g: ^Graph, base_y: f32 = 0) {
 		}
 		prev = curr
 
-		pos := V2{20 + f32(x_offset), base_y + 20 + f32(100 * row)}
+		pos := V2{f32(x_offset), base_y + f32(100 * row)}
 
 		fmt.println(pos)
 		g.debug_draw_rect(
