@@ -374,7 +374,6 @@ add_graph3 :: proc(graphs: ^[dynamic][2]Graph) {
 		{id = 1},
 		{id = 2},
 		{id = 3},
-		{id = 4},
 		{id = 5},
 		{id = 6},
 		{id = 7},
@@ -384,7 +383,6 @@ add_graph3 :: proc(graphs: ^[dynamic][2]Graph) {
 	edges := [?]Edge {
 		{from = 1, to = 2},
 		{from = 2, to = 3},
-		{from = 4, to = 5},
 		{from = 5, to = 6},
 		{from = 7, to = 8},
 		{from = 8, to = 9},

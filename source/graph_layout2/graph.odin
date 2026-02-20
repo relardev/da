@@ -1,6 +1,5 @@
 package graph_layout2
 
-import "base:runtime"
 import "core:fmt"
 import "core:log"
 import "core:mem"
@@ -27,6 +26,17 @@ Graph :: struct {
 	node_size:           V2,
 	debug_draw_rect:     proc(pos: V2, size: V2, color: [4]u8, text: string),
 	debug_new_section:   proc(name: string),
+
+	// barycenter algorithm temporaries
+	dp_slots:            #soa[dynamic]DPSlot,
+	back_matrix:         []i16,
+	sort_indices:        []u16,
+}
+
+// barycenter algorithm DP temporaries
+DPSlot :: struct {
+	prev: f32,
+	curr: f32,
 }
 
 EdgeHandle :: struct {
@@ -42,18 +52,21 @@ SegmentHandle :: struct {
 }
 
 Node :: struct {
-	id:          NodeHandle,
-	external_id: ExternalID,
-	in_edges:    EdgeHandle,
-	out_edges:   EdgeHandle,
+	id:           NodeHandle,
+	external_id:  ExternalID,
+	in_edges:     EdgeHandle,
+	out_edges:    EdgeHandle,
 
 	// layer assignment
-	stack_next:  NodeHandle,
-	stack_prev:  NodeHandle,
-	layer:       u16,
+	stack_next:   NodeHandle,
+	stack_prev:   NodeHandle,
+	layer:        u16,
 
 	// columns
-	column:      u16,
+	column:       u16,
+
+	// barycenter algorithm
+	barycenter_x: f32,
 }
 
 Edge :: struct {
@@ -128,6 +141,13 @@ graph_init :: proc(
 
 	g.debug_draw_rect = debug_draw_rect
 	g.debug_new_section = debug_new_section
+
+	// barycenter algorithm temporaries
+	max_nodes := int(node_capacity + 2)
+	g.dp_slots = make(#soa[dynamic]DPSlot, max_nodes, allocator)
+	g.dp_slots.allocator = nil_alloc
+	g.back_matrix = make([]i16, max_nodes * max_nodes, allocator)
+	g.sort_indices = make([]u16, max_nodes, allocator)
 }
 
 graph_node_add :: proc(g: ^Graph, id: ExternalID) -> bool {
@@ -158,7 +178,7 @@ graph_node_read :: proc(g: ^Graph, id: ExternalID) -> (V2, bool) {
 }
 
 graph_edge_add :: proc(g: ^Graph, from_id, to_id: ExternalID) -> bool {
-	fmt.println("ADD EDGE ", from_id, " -> ", to_id)
+	// fmt.println("ADD EDGE ", from_id, " -> ", to_id)
 	if from_id == to_id {
 		// No self-loops allowed.
 		return false
@@ -265,56 +285,22 @@ graph_layout_compute :: proc(g: ^Graph) {
 			continue
 		}
 
-		fmt.println("starting tree walk for node ", node_layer1.id.offset, i)
+		// fmt.println("starting tree walk for node ", node_layer1.id.offset, i)
 
 		stack_top: #soa^#soa[dynamic]Node = nil
 		node_stack_push(&stack_top, node_layer1)
 
 		for { 	// go through stack of edges
 			node := node_stack_pop(g, &stack_top)
-			if node == nil {
-				fmt.println(
-					"done with tree walk for node ",
-					node_layer1.id.offset,
-					i,
-				)
-				break
-			}
-
-			if node.out_edges == {} {
-				fmt.println(
-					"node ",
-					node.id.offset,
-					" has no out edges, skipping",
-				)
-				continue
-			}
+			if node == nil {break}
+			if node.out_edges == {} {continue}
 
 			start_edge := edge_get(g, node.out_edges)
-			fmt.println(
-				"processing out edges for node ",
-				node.id.offset,
-				", starting with edge ",
-				start_edge.id.offset,
-			)
 			edge := start_edge
 			for {
-				fmt.println(
-					"  processing edge ",
-					edge.id.offset,
-					" to node ",
-					edge.dst.offset,
-				)
 				next_node := node_get(g, edge.dst)
 				next_node.layer = max(next_node.layer, node.layer + 1)
 				node_stack_push(&stack_top, next_node)
-
-				fmt.println(
-					"    setting node ",
-					next_node.id.offset,
-					" to layer ",
-					next_node.layer,
-				)
 
 				edge = edge_get(g, edge.src_next)
 				if edge.id == start_edge.id {
@@ -369,7 +355,9 @@ graph_layout_compute :: proc(g: ^Graph) {
 	assign_columns(g)
 
 	debug_draw_section(g, "after")
-	debug_draw_nodes_split_by_layer(g)
+	// debug_draw_nodes_split_by_layer(g)
+
+	debug_draw_nodes_proper_position(g)
 
 	print_state(0, g, "COMPUE END")
 
@@ -395,7 +383,6 @@ node_stack_pop :: proc(
 ) -> #soa^#soa[dynamic]Node {
 	popped := stack_top^
 	if popped == nil {
-		fmt.println("stack is empty, cannot pop")
 		return nil
 	}
 
@@ -482,45 +469,303 @@ print_state :: proc(indent: int, g: ^Graph, name: string) {
 		}
 	}
 
-	when DEBUG {
-		fmt.printf("%*s------ %s ------\n", 2 * indent, "", name)
-		for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
-			node := g.nodes[i]
-			fmt.printf(
-				"%*sNode[%d] id:%d eid:%d, row:%d layer:%d in_edges=%d, out_edges=%d\n",
-				2 * (indent + 1),
-				"",
-				i,
-				node.id.offset,
-				node.external_id,
-				node.column,
-				node.layer,
-				node.in_edges.offset,
-				node.out_edges.offset,
-			)
-		}
+	when !DEBUG {
+		return
+	}
+	fmt.printf("%*s------ %s ------\n", 2 * indent, "", name)
+	for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
+		node := g.nodes[i]
+		fmt.printf(
+			"%*sNode[%d] id:%d eid:%d, column:%d layer:%d in_edges=%d, out_edges=%d\n",
+			2 * (indent + 1),
+			"",
+			i,
+			node.id.offset,
+			node.external_id,
+			node.column,
+			node.layer,
+			node.in_edges.offset,
+			node.out_edges.offset,
+		)
+	}
 
-		for i: u16 = 1; i < u16(len(g.edges)); i += 1 {
-			edge := g.edges[i]
-			fmt.printf(
-				"%*sEdge[%d] id:%d: src=%d, dst=%d, src_next=%d, src_prev=%d, dst_next=%d, dst_prev=%d\n",
-				2 * (indent + 1),
-				"",
-				i,
-				edge.id.offset,
-				edge.src.offset,
-				edge.dst.offset,
-				edge.src_next.offset,
-				edge.src_prev.offset,
-				edge.dst_next.offset,
-				edge.dst_prev.offset,
-			)
-		}
+	for i: u16 = 1; i < u16(len(g.edges)); i += 1 {
+		edge := g.edges[i]
+		fmt.printf(
+			"%*sEdge[%d] id:%d: src=%d, dst=%d, src_next=%d, src_prev=%d, dst_next=%d, dst_prev=%d\n",
+			2 * (indent + 1),
+			"",
+			i,
+			edge.id.offset,
+			edge.src.offset,
+			edge.dst.offset,
+			edge.src_next.offset,
+			edge.src_prev.offset,
+			edge.dst_next.offset,
+			edge.dst_prev.offset,
+		)
 	}
 }
 
 assign_columns :: proc(g: ^Graph) {
-	// TODO
+	node_count := len(g.nodes)
+	if node_count <= 1 {
+		return
+	}
+
+	// First pass: find maximum layer size
+	max_layer_size := 0
+	{
+		layer_start := 1
+		for layer_start < node_count {
+			current_layer := g.nodes[layer_start].layer
+			layer_end := layer_start
+			for layer_end < node_count &&
+			    g.nodes[layer_end].layer == current_layer {
+				layer_end += 1
+			}
+			layer_size := layer_end - layer_start
+			if layer_size > max_layer_size {
+				max_layer_size = layer_size
+			}
+			layer_start = layer_end
+		}
+	}
+
+	// Initialize barycenter_x and column for all nodes
+	for i := 1; i < node_count; i += 1 {
+		g.nodes[i].barycenter_x = f32(i)
+		g.nodes[i].column = u16(i)
+	}
+
+	// 10 iterations alternating forward/backward passes
+	for iter := 0; iter < 10; iter += 1 {
+		direction := iter % 2
+
+		// Find layer boundaries (nodes are sorted by layer)
+		layer_start := 1
+		for layer_start < node_count {
+			current_layer := g.nodes[layer_start].layer
+			layer_end := layer_start
+
+			// Find end of this layer
+			for layer_end < node_count &&
+			    g.nodes[layer_end].layer == current_layer {
+				layer_end += 1
+			}
+
+			// Compute barycenter for each node in layer
+			for i := layer_start; i < layer_end; i += 1 {
+				sum: f32 = 0
+				count := 0
+
+				if direction == 0 {
+					// Forward pass: use predecessors (in_edges)
+					first_edge := g.nodes[i].in_edges
+					if first_edge.offset != 0 {
+						edge_handle := first_edge
+						for {
+							edge := edge_get(g, edge_handle)
+							pred := node_get(g, edge.src)
+							sum += pred.barycenter_x
+							count += 1
+
+							edge_handle = edge.dst_next
+							if edge_handle.offset == first_edge.offset {
+								break
+							}
+						}
+					}
+				} else {
+					// Backward pass: use children (out_edges)
+					first_edge := g.nodes[i].out_edges
+					if first_edge.offset != 0 {
+						edge_handle := first_edge
+						for {
+							edge := edge_get(g, edge_handle)
+							child := node_get(g, edge.dst)
+							sum += child.barycenter_x
+							count += 1
+
+							edge_handle = edge.src_next
+							if edge_handle.offset == first_edge.offset {
+								break
+							}
+						}
+					}
+				}
+
+				if count > 0 {
+					g.nodes[i].barycenter_x = sum / f32(count)
+				}
+			}
+
+			// Apply optimal DP assignment for this layer
+			// Use max_layer_size as n_slots to allow gaps in column assignment
+			optimal_assign_layer(g, layer_start, layer_end, max_layer_size)
+
+			// Update barycenter_x to match assigned column
+			for i := layer_start; i < layer_end; i += 1 {
+				g.nodes[i].barycenter_x = f32(g.nodes[i].column)
+			}
+
+			layer_start = layer_end
+		}
+	}
+}
+
+// Assigns optimal discrete column positions to nodes in a layer using DP
+// layer_start: first node index (inclusive)
+// layer_end: last node index (exclusive)
+// n_slots: number of available column slots
+optimal_assign_layer :: proc(
+	g: ^Graph,
+	layer_start, layer_end: int,
+	n_slots: int,
+) {
+	m := layer_end - layer_start // number of items to place
+	if m == 0 {
+		return
+	}
+
+	n := n_slots
+	if n < m {
+		n = m // need at least as many slots as items
+	}
+
+	// Build sorted indices array (don't move nodes, just track order)
+	// Initialize sort_indices with node indices
+	for i := 0; i < m; i += 1 {
+		g.sort_indices[i] = u16(layer_start + i)
+	}
+
+	// Sort indices by barycenter_x using insertion sort
+	for i := 1; i < m; i += 1 {
+		j := i
+		for j > 0 {
+			idx_j := g.sort_indices[j]
+			idx_j_1 := g.sort_indices[j - 1]
+			if g.nodes[idx_j].barycenter_x < g.nodes[idx_j_1].barycenter_x {
+				g.sort_indices[j] = idx_j_1
+				g.sort_indices[j - 1] = idx_j
+				j -= 1
+			} else {
+				break
+			}
+		}
+	}
+
+	// Trivial case: single node
+	if m == 1 {
+		node_idx := g.sort_indices[0]
+		best := int(g.nodes[node_idx].barycenter_x + 0.5)
+		if best < 0 {
+			best = 0
+		}
+		if best >= n {
+			best = n - 1
+		}
+		g.nodes[node_idx].column = u16(best)
+		return
+	}
+
+	// If m == n, assign columns 0..m-1 in sorted order
+	if m == n {
+		for i := 0; i < m; i += 1 {
+			node_idx := g.sort_indices[i]
+			g.nodes[node_idx].column = u16(i)
+		}
+		return
+	}
+
+	// General DP case: m items, n slots, m < n
+	INF: f32 = 3.4e38
+
+	// Initialize dp_prev
+	for j := 0; j < n; j += 1 {
+		g.dp_slots[j].prev = INF
+	}
+
+	// First item (k=0)
+	upper0 := n - (m - 1)
+	if upper0 > n - 1 {
+		upper0 = n - 1
+	}
+	node0_idx := g.sort_indices[0]
+	x0 := g.nodes[node0_idx].barycenter_x
+	for j := 0; j <= upper0; j += 1 {
+		d := f32(j) - x0
+		g.dp_slots[j].prev = d * d
+	}
+
+	// DP transitions for k = 1..m-1
+	for k := 1; k < m; k += 1 {
+		for j := 0; j < n; j += 1 {
+			g.dp_slots[j].curr = INF
+		}
+
+		j_min := k
+		j_max := n - (m - 1 - k)
+		if j_max > n - 1 {
+			j_max = n - 1
+		}
+
+		prev_min := k - 1
+		prev_max := n - (m - 1 - (k - 1))
+		if prev_max > n - 1 {
+			prev_max = n - 1
+		}
+
+		nodek_idx := g.sort_indices[k]
+		xk := g.nodes[nodek_idx].barycenter_x
+		best_cost: f32 = INF
+		best_idx := -1
+
+		for j := j_min; j <= j_max; j += 1 {
+			prev_candidate := j - 1
+			if prev_candidate >= prev_min && prev_candidate <= prev_max {
+				cost_cand := g.dp_slots[prev_candidate].prev
+				if cost_cand < best_cost {
+					best_cost = cost_cand
+					best_idx = prev_candidate
+				}
+			}
+			if best_idx >= 0 {
+				d := f32(j) - xk
+				g.dp_slots[j].curr = best_cost + d * d
+				g.back_matrix[k * n + j] = i16(best_idx)
+			}
+		}
+
+		// Swap prev and curr
+		for j := 0; j < n; j += 1 {
+			g.dp_slots[j].prev = g.dp_slots[j].curr
+		}
+	}
+
+	// Find best terminal position
+	k_last := m - 1
+	best_final_cost: f32 = INF
+	best_final_j := -1
+	term_min := k_last
+	term_max := n - 1
+	for j := term_min; j <= term_max; j += 1 {
+		c := g.dp_slots[j].prev
+		if c < best_final_cost {
+			best_final_cost = c
+			best_final_j = j
+		}
+	}
+
+	// Backtrack to find all slot assignments
+	j := best_final_j
+	for k := k_last; k >= 0; k -= 1 {
+		node_idx := g.sort_indices[k]
+		g.nodes[node_idx].column = u16(j)
+		if k > 0 {
+			j = int(g.back_matrix[k * n + j])
+		}
+	}
 }
 
 DEBUG_RECT_SIDE :: 40
@@ -568,11 +813,29 @@ debug_draw_nodes_split_by_layer :: proc(g: ^Graph, base_y: f32 = 0) {
 
 		pos := V2{f32(x_offset), base_y + f32(dist_between_rects * row)}
 
-		fmt.println(pos)
 		g.debug_draw_rect(
 			pos,
 			DEBUG_RECT_SIZE,
 			[4]u8{0, 0, 255, 255},
+			fmt.tprintf("x%d", i),
+		)
+	}
+}
+
+debug_draw_nodes_proper_position :: proc(g: ^Graph) {
+	when !DEBUG {
+		return
+	}
+
+	for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
+		node := g.nodes[i]
+		pos :=
+			(DEBUG_PADDING + DEBUG_RECT_SIDE) *
+			V2{f32(node.column), f32(node.layer)}
+		g.debug_draw_rect(
+			pos,
+			DEBUG_RECT_SIZE,
+			[4]u8{255, 0, 0, 255},
 			fmt.tprintf("x%d", i),
 		)
 	}
