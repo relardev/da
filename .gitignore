@@ -3,3 +3,4 @@ AGENTS.md
 .gdb_history
 game_hot_reload.bin
 visualizer
+test_harness

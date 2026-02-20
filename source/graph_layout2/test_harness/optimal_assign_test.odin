@@ -112,8 +112,6 @@ run_optimal_assign_test :: proc(t: ^testing.T, tt: OptimalAssignTest) {
 		1, // minimal edge capacity
 		{100, 50},
 		context.allocator,
-		debug_draw_rect = debug_draw_rect,
-		debug_new_section = debug_new_section,
 	)
 
 	// Add nodes and set their barycenter values
@@ -167,8 +165,6 @@ test_assign_columns_integration :: proc(t: ^testing.T) {
 		6,
 		{100, 50},
 		context.allocator,
-		debug_draw_rect = debug_draw_rect,
-		debug_new_section = debug_new_section,
 	)
 
 	// Add nodes

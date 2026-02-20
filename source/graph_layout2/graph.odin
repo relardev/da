@@ -777,6 +777,10 @@ debug_draw_nodes_order :: proc(g: ^Graph, base_y: f32 = 0) {
 		return
 	}
 
+	if g.debug_draw_rect == nil {
+		return
+	}
+
 	dist_between_rects :: DEBUG_RECT_SIDE + DEBUG_PADDING
 
 	for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
@@ -793,6 +797,10 @@ debug_draw_nodes_order :: proc(g: ^Graph, base_y: f32 = 0) {
 
 debug_draw_nodes_split_by_layer :: proc(g: ^Graph, base_y: f32 = 0) {
 	when !DEBUG {
+		return
+	}
+
+	if g.debug_draw_rect == nil {
 		return
 	}
 
@@ -827,6 +835,10 @@ debug_draw_nodes_proper_position :: proc(g: ^Graph) {
 		return
 	}
 
+	if g.debug_draw_rect == nil {
+		return
+	}
+
 	for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
 		node := g.nodes[i]
 		pos :=
@@ -843,7 +855,9 @@ debug_draw_nodes_proper_position :: proc(g: ^Graph) {
 
 debug_draw_section :: proc(g: ^Graph, name: string) {
 	when DEBUG {
-		g.debug_new_section(name)
+		if g.debug_new_section != nil {
+			g.debug_new_section(name)
+		}
 	}
 }
 debug_draw_rect :: proc(
@@ -854,6 +868,8 @@ debug_draw_rect :: proc(
 	text: string,
 ) {
 	when DEBUG {
-		g.debug_draw_rect(pos, size, color, text)
+		if g.debug_draw_rect != nil {
+			g.debug_draw_rect(pos, size, color, text)
+		}
 	}
 }

@@ -52,7 +52,7 @@ main :: proc() {
 
 	graphs := make([dynamic][2]Graph, 0)
 
-	add_graph_full_20_5(&graphs)
+	add_graph_pyramid(&graphs)
 	add_graph3(&graphs)
 	add_graph1(&graphs)
 	add_graph2(&graphs)
@@ -399,8 +399,7 @@ add_graph3 :: proc(graphs: ^[dynamic][2]Graph) {
 	graph_fill(graphs, nodes[:], edges[:], 400)
 }
 
-// example_20_5 := #load("../examples/full_20_5.json")
-add_graph_full_20_5 :: proc(graphs: ^[dynamic][2]Graph) {
+add_graph_pyramid :: proc(graphs: ^[dynamic][2]Graph) {
 	nodes := [?]Node {
 		// Layer 0: 1 node
 		{id = 0},
