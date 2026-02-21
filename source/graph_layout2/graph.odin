@@ -13,7 +13,8 @@ _ :: ts
 V2 :: [2]f32
 V2i :: [2]i32
 
-DEBUG: bool : true
+DEBUG_DRAW :: true
+DEBUG_PRINT :: true
 
 DEFAULT_NODE_SPACING :: 150.0
 
@@ -375,7 +376,6 @@ graph_layout_compute :: proc(g: ^Graph) {
 	debug_draw_nodes_proper_position(g)
 
 	print_state(0, g, "COMPUE END")
-
 }
 
 node_stack_push :: proc(
@@ -484,9 +484,10 @@ print_state :: proc(indent: int, g: ^Graph, name: string) {
 		}
 	}
 
-	when !DEBUG {
+	when !DEBUG_PRINT {
 		return
 	}
+
 	fmt.printf("%*s------ %s ------\n", 2 * indent, "", name)
 	for i: u16 = 1; i < u16(len(g.nodes)); i += 1 {
 		node := g.nodes[i]
@@ -504,6 +505,8 @@ print_state :: proc(indent: int, g: ^Graph, name: string) {
 		)
 	}
 
+	fmt.println()
+
 	for i: u16 = 1; i < u16(len(g.edges)); i += 1 {
 		edge := g.edges[i]
 		fmt.printf(
@@ -518,6 +521,18 @@ print_state :: proc(indent: int, g: ^Graph, name: string) {
 			edge.src_prev.offset,
 			edge.dst_next.offset,
 			edge.dst_prev.offset,
+		)
+	}
+
+	fmt.println()
+
+	for k, v in g.external_id_to_node {
+		fmt.printf(
+			"%*sExternalID %d -> NodeHandle %d\n",
+			2 * (indent + 1),
+			"",
+			k,
+			v.offset,
 		)
 	}
 }
@@ -816,7 +831,7 @@ DEBUG_PADDING :: 10
 DEBUG_RECT_SIZE: V2 = {DEBUG_RECT_SIDE, DEBUG_RECT_SIDE}
 
 debug_draw_nodes_order :: proc(g: ^Graph, base_y: f32 = 0) {
-	when !DEBUG {
+	when !DEBUG_DRAW {
 		return
 	}
 
@@ -839,7 +854,7 @@ debug_draw_nodes_order :: proc(g: ^Graph, base_y: f32 = 0) {
 }
 
 debug_draw_nodes_split_by_layer :: proc(g: ^Graph, base_y: f32 = 0) {
-	when !DEBUG {
+	when !DEBUG_DRAW {
 		return
 	}
 
@@ -874,7 +889,7 @@ debug_draw_nodes_split_by_layer :: proc(g: ^Graph, base_y: f32 = 0) {
 }
 
 debug_draw_nodes_proper_position :: proc(g: ^Graph) {
-	when !DEBUG {
+	when !DEBUG_DRAW {
 		return
 	}
 
@@ -897,7 +912,7 @@ debug_draw_nodes_proper_position :: proc(g: ^Graph) {
 }
 
 debug_draw_section :: proc(g: ^Graph, name: string) {
-	when DEBUG {
+	when DEBUG_DRAW {
 		if g.debug_new_section != nil {
 			g.debug_new_section(name)
 		}
@@ -910,7 +925,7 @@ debug_draw_rect :: proc(
 	color: [4]u8,
 	text: string,
 ) {
-	when DEBUG {
+	when DEBUG_DRAW {
 		if g.debug_draw_rect != nil {
 			g.debug_draw_rect(pos, size, color, text)
 		}
