@@ -52,6 +52,7 @@ main :: proc() {
 
 	graphs := make([dynamic][2]Graph, 0)
 
+	add_graph_inverted_pyramid(&graphs)
 	add_graph_pyramid(&graphs)
 	add_graph3(&graphs)
 	add_graph1(&graphs)
@@ -394,6 +395,37 @@ add_graph3 :: proc(graphs: ^[dynamic][2]Graph) {
 		{from = 5, to = 6},
 		{from = 7, to = 8},
 		{from = 8, to = 9},
+	}
+
+	graph_fill(graphs, nodes[:], edges[:], 400)
+}
+
+add_graph_inverted_pyramid :: proc(graphs: ^[dynamic][2]Graph) {
+	nodes := [?]Node {
+		// Layer 0: 5 nodes
+		{id = 0},
+		{id = 1},
+		{id = 2},
+		{id = 3},
+		{id = 4},
+		// Layer 1: 3 nodes
+		{id = 5},
+		{id = 6},
+		{id = 7},
+		// Layer 2: 1 node
+		{id = 8},
+	}
+	edges := [?]Edge {
+		// Layer 0 -> Layer 1
+		{from = 0, to = 5},
+		{from = 1, to = 5},
+		{from = 2, to = 6},
+		{from = 3, to = 7},
+		{from = 4, to = 7},
+		// Layer 1 -> Layer 2
+		{from = 5, to = 8},
+		{from = 6, to = 8},
+		{from = 7, to = 8},
 	}
 
 	graph_fill(graphs, nodes[:], edges[:], 400)

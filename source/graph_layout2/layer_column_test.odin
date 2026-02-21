@@ -34,6 +34,24 @@ test_graph_layout :: proc(t: ^testing.T) {
 			expected_layers  = {0, 1, 1, 1, 2, 2, 2, 2, 2},
 			expected_columns = {2, 1, 2, 3, 0, 1, 2, 3, 4},
 		},
+		{
+			name             = "Inverted pyramid graph",
+			nodes            = {0, 1, 2, 3, 4, 5, 6, 7, 8},
+			edges            = {
+				// Layer 0 -> Layer 1
+				{0, 5},
+				{1, 5},
+				{2, 6},
+				{3, 7},
+				{4, 7},
+				// Layer 1 -> Layer 2
+				{5, 8},
+				{6, 8},
+				{7, 8},
+			},
+			expected_layers  = {0, 0, 0, 0, 0, 1, 1, 1, 2},
+			expected_columns = {0, 1, 2, 3, 4, 1, 2, 3, 2},
+		},
 	}
 
 	for tt in tests {
