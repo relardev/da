@@ -87,7 +87,7 @@ test_optimal_assign_layer :: proc(t: ^testing.T) {
 			name = "Fix order - unsorted barycenters",
 			n_slots = 3,
 			items = {{barycenter = 0.5}, {barycenter = 1.9}},
-			want_cols = {0, 2},
+			want_cols = {1, 2}, // centering bias breaks tie toward center
 		},
 	}
 

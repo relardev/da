@@ -710,6 +710,8 @@ optimal_assign_layer :: proc(
 
 	// General DP case: m items, n slots, m < n
 	INF: f32 = 3.4e38
+	CENTER_BIAS: f32 = 1e-6
+	center := f32(n - 1) / 2.0
 
 	// Initialize dp_prev
 	for j := 0; j < n; j += 1 {
@@ -725,7 +727,8 @@ optimal_assign_layer :: proc(
 	x0 := g.nodes[node0_idx].barycenter_x
 	for j := 0; j <= upper0; j += 1 {
 		d := f32(j) - x0
-		g.dp_slots[j].prev = d * d
+		dc := f32(j) - center
+		g.dp_slots[j].prev = d * d + CENTER_BIAS * dc * dc
 	}
 
 	// DP transitions for k = 1..m-1
@@ -762,7 +765,8 @@ optimal_assign_layer :: proc(
 			}
 			if best_idx >= 0 {
 				d := f32(j) - xk
-				g.dp_slots[j].curr = best_cost + d * d
+				dc := f32(j) - center
+				g.dp_slots[j].curr = best_cost + d * d + CENTER_BIAS * dc * dc
 				g.back_matrix[k * n + j] = i16(best_idx)
 			}
 		}
