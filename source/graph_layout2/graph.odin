@@ -31,6 +31,11 @@ Graph :: struct {
 	dp_slots:            #soa[dynamic]DPSlot,
 	back_matrix:         []i16,
 	sort_indices:        []u16,
+	layer_boundaries:    []LayerBoundary,
+}
+
+LayerBoundary :: struct {
+	start, end: int,
 }
 
 // barycenter algorithm DP temporaries
@@ -148,6 +153,7 @@ graph_init :: proc(
 	g.dp_slots.allocator = nil_alloc
 	g.back_matrix = make([]i16, max_nodes * max_nodes, allocator)
 	g.sort_indices = make([]u16, max_nodes, allocator)
+	g.layer_boundaries = make([]LayerBoundary, max_nodes, allocator)
 }
 
 graph_node_add :: proc(g: ^Graph, id: ExternalID) -> bool {
@@ -532,27 +538,53 @@ assign_columns :: proc(g: ^Graph) {
 		}
 	}
 
-	// Initialize barycenter_x and column for all nodes
-	for i := 1; i < node_count; i += 1 {
-		g.nodes[i].barycenter_x = f32(i)
-		g.nodes[i].column = u16(i)
-	}
-
-	// 10 iterations alternating forward/backward passes
-	for iter := 0; iter < 10; iter += 1 {
-		direction := iter % 2
-
-		// Find layer boundaries (nodes are sorted by layer)
+	// Initialize barycenter_x and column for all nodes, centered within max_layer_size
+	{
 		layer_start := 1
 		for layer_start < node_count {
 			current_layer := g.nodes[layer_start].layer
 			layer_end := layer_start
-
-			// Find end of this layer
 			for layer_end < node_count &&
 			    g.nodes[layer_end].layer == current_layer {
 				layer_end += 1
 			}
+			layer_size := layer_end - layer_start
+			offset := f32(max_layer_size - layer_size) / 2.0
+			for i := layer_start; i < layer_end; i += 1 {
+				pos := offset + f32(i - layer_start)
+				g.nodes[i].barycenter_x = pos
+				g.nodes[i].column = u16(pos)
+			}
+			layer_start = layer_end
+		}
+	}
+
+	// Collect layer boundaries (nodes are sorted by layer)
+	num_layers := 0
+	{
+		layer_start := 1
+		for layer_start < node_count {
+			current_layer := g.nodes[layer_start].layer
+			layer_end := layer_start
+			for layer_end < node_count &&
+			    g.nodes[layer_end].layer == current_layer {
+				layer_end += 1
+			}
+			g.layer_boundaries[num_layers] = {layer_start, layer_end}
+			num_layers += 1
+			layer_start = layer_end
+		}
+	}
+
+	// 11 iterations alternating forward/backward passes (odd count to end on forward)
+	for iter := 0; iter < 11; iter += 1 {
+		direction := iter % 2
+
+		for li := 0; li < num_layers; li += 1 {
+			// Forward pass: top-to-bottom; Backward pass: bottom-to-top
+			layer_idx := direction == 0 ? li : (num_layers - 1 - li)
+			layer_start := g.layer_boundaries[layer_idx].start
+			layer_end := g.layer_boundaries[layer_idx].end
 
 			// Compute barycenter for each node in layer
 			for i := layer_start; i < layer_end; i += 1 {
@@ -608,8 +640,6 @@ assign_columns :: proc(g: ^Graph) {
 			for i := layer_start; i < layer_end; i += 1 {
 				g.nodes[i].barycenter_x = f32(g.nodes[i].column)
 			}
-
-			layer_start = layer_end
 		}
 	}
 }
