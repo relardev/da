@@ -331,18 +331,19 @@ graph_layout_compute :: proc(g: ^Graph) {
 	si := sort.Interface {
 		len = proc(it: sort.Interface) -> int {
 			g := (^Graph)(it.collection)
-			return len(g.nodes)
+			return len(g.nodes) - 1 // exclude sentinel at index 0
 		},
 		swap = proc(it: sort.Interface, a, b: int) {
 			g := (^Graph)(it.collection)
-			nodes := &g.nodes
+			nodes := g.nodes[1:]
 			ah := nodes[a].id
 			bh := nodes[b].id
 			swap(g, &ah, &bh)
 		},
 		less = proc(it: sort.Interface, a, b: int) -> bool {
 			g := (^Graph)(it.collection)
-			return g.nodes[a].layer < g.nodes[b].layer
+			nodes := g.nodes[1:]
+			return nodes[a].layer < nodes[b].layer
 		},
 		collection = g,
 	}
