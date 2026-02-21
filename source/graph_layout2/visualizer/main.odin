@@ -4,6 +4,7 @@ import gl2 "../"
 import gl "../../graph_layout/"
 import "base:runtime"
 import "core:fmt"
+import "core:os"
 import "core:strings"
 import rl "vendor:raylib"
 
@@ -47,6 +48,18 @@ Graph :: struct {
 }
 
 main :: proc() {
+	text_mode := false
+	for arg in os.args[1:] {
+		if arg == "--text" {
+			text_mode = true
+		}
+	}
+
+	if text_mode {
+		run_text_mode()
+		return
+	}
+
 	rl.InitWindow(2000, 1200, "graph viz")
 	max_node_size := V2{50, 50}
 
@@ -515,4 +528,48 @@ add_graph_wide_pyramid :: proc(graphs: ^[dynamic][2]Graph) {
 	}
 
 	graph_fill(graphs, nodes[:], edges[:], 400)
+}
+
+run_text_mode :: proc() {
+	max_node_size := V2{50, 50}
+
+	graphs := make([dynamic][2]Graph, 0)
+
+	add_graph_wide_pyramid(&graphs)
+
+	g := &graphs[0][1]
+
+	graph: gl2.Graph
+	gl2.graph_init(
+		&graph,
+		u16(len(g.nodes)),
+		u16(len(g.edges)),
+		max_node_size,
+		context.allocator,
+		node_spacing = 75,
+	)
+
+	for node in g.nodes {
+		ok := gl2.graph_node_add(&graph, u64(node.id))
+		assert(ok)
+	}
+
+	for edge in g.edges {
+		ok := gl2.graph_edge_add(&graph, u64(edge.from), u64(edge.to))
+		assert(ok)
+	}
+
+	gl2.graph_layout_compute(&graph)
+
+	fmt.println("Nodes:")
+	for node in g.nodes {
+		pos, ok := gl2.graph_node_read(&graph, u64(node.id))
+		assert(ok)
+		fmt.printf("  Node %d: (%.1f, %.1f)\n", node.id, pos[0], pos[1])
+	}
+
+	fmt.println("Edges:")
+	for edge in g.edges {
+		fmt.printf("  Edge %d -> %d\n", edge.from, edge.to)
+	}
 }
