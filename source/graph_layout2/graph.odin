@@ -180,7 +180,7 @@ graph_node_read :: proc(g: ^Graph, id: ExternalID) -> (V2, bool) {
 
 	node := g.nodes[node_id.offset]
 
-	return {f32(150 * node.column), f32(150 * node.layer)}, true
+	return {f32(75 * node.column), f32(75 * node.layer)}, true
 }
 
 graph_edge_add :: proc(g: ^Graph, from_id, to_id: ExternalID) -> bool {
