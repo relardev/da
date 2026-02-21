@@ -85,7 +85,13 @@ main :: proc() {
 			run_gl_layout = false
 			g := graph_1
 			gl_buffer := runtime.make_aligned([]u8, 64 * 1024 * 1024, 64)
-			gl_graph := gl.graph_new(gl_buffer, len(g.nodes), len(g.edges))
+			gl_graph := gl.graph_new(
+				gl_buffer,
+				len(g.nodes),
+				len(g.edges),
+				gutter_edge_distance = 10,
+				gutter_padding = 20,
+			)
 			for i: int = 0; i < len(g.nodes); i += 1 {
 				gl.graph_add_node(gl_graph, u64(g.nodes[i].id), max_node_size)
 			}
@@ -207,6 +213,7 @@ main :: proc() {
 				context.allocator,
 				debug_draw_rect = debug_draw_rect,
 				debug_new_section = debug_section,
+				node_spacing = 75,
 			)
 
 			for node in g.nodes {

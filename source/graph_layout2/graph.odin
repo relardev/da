@@ -15,6 +15,8 @@ V2i :: [2]i32
 
 DEBUG: bool : true
 
+DEFAULT_NODE_SPACING :: 150.0
+
 ExternalID :: u64
 
 Graph :: struct {
@@ -24,6 +26,7 @@ Graph :: struct {
 	segments:            #soa[dynamic]Segment,
 	external_id_to_node: map[ExternalID]NodeHandle,
 	node_size:           V2,
+	node_spacing:        f32,
 	debug_draw_rect:     proc(pos: V2, size: V2, color: [4]u8, text: string),
 	debug_new_section:   proc(name: string),
 
@@ -115,6 +118,7 @@ graph_init :: proc(
 	allocator: mem.Allocator,
 	debug_draw_rect: proc(pos: V2, size: V2, color: [4]u8, text: string) = nil,
 	debug_new_section: proc(name: string) = nil,
+	node_spacing: f32 = DEFAULT_NODE_SPACING,
 ) {
 	nil_alloc := mem.nil_allocator()
 	g.nodes = make(#soa[dynamic]Node, 0, node_capacity + 2, allocator)
@@ -143,6 +147,7 @@ graph_init :: proc(
 	g.external_id_to_node.allocator = nil_alloc
 
 	g.node_size = node_size
+	g.node_spacing = node_spacing
 
 	g.debug_draw_rect = debug_draw_rect
 	g.debug_new_section = debug_new_section
@@ -180,7 +185,11 @@ graph_node_read :: proc(g: ^Graph, id: ExternalID) -> (V2, bool) {
 
 	node := g.nodes[node_id.offset]
 
-	return {f32(75 * node.column), f32(75 * node.layer)}, true
+	return {
+			g.node_spacing * f32(node.column),
+			g.node_spacing * f32(node.layer),
+		},
+		true
 }
 
 graph_edge_add :: proc(g: ^Graph, from_id, to_id: ExternalID) -> bool {

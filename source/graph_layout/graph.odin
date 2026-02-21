@@ -10,8 +10,8 @@ import ts "topological_sort"
 
 _ :: log
 
-gutter_edge_distance :: 20.0 // distance between edges in gutters
-gutter_padding :: 40.0 // padding around gutters
+DEFAULT_GUTTER_EDGE_DISTANCE :: 20.0 // distance between edges in gutters
+DEFAULT_GUTTER_PADDING :: 40.0 // padding around gutters
 node_landing_padding :: 10.0 // padding for node side where edge arrows can "land"
 bridge_gap :: 5.0 // gap size for edge crossings, whole gap will be 2*bridge_gap
 
@@ -24,14 +24,16 @@ V2 :: [2]f32
 V2i :: [2]i32
 
 Graph :: struct {
-	arena:              mem.Arena,
-	arena_allocator:    mem.Allocator,
-	allocator:          mem.Allocator,
-	nodes:              [dynamic]Node,
-	edges:              [dynamic]Edge,
-	gutters_vertical:   [dynamic]Gutter,
-	gutters_horizontal: [dynamic]Gutter,
-	node_size:          V2,
+	arena:                mem.Arena,
+	arena_allocator:      mem.Allocator,
+	allocator:            mem.Allocator,
+	nodes:                [dynamic]Node,
+	edges:                [dynamic]Edge,
+	gutters_vertical:     [dynamic]Gutter,
+	gutters_horizontal:   [dynamic]Gutter,
+	node_size:            V2,
+	gutter_edge_distance: f32,
+	gutter_padding:       f32,
 }
 
 NodeOffset :: u16
@@ -266,7 +268,7 @@ allocation_needed :: proc(
 	return sum, 64
 }
 
-graph_new :: proc(buffer: []u8, nodes: int, edges: int) -> ^Graph {
+graph_new :: proc(buffer: []u8, nodes: int, edges: int, gutter_edge_distance: f32 = DEFAULT_GUTTER_EDGE_DISTANCE, gutter_padding: f32 = DEFAULT_GUTTER_PADDING) -> ^Graph {
 	graph := cast(^Graph)raw_data(buffer)
 	mark_memory_used(graph, graph, "Graph")
 	size_of_graph := size_of(Graph)
@@ -280,6 +282,9 @@ graph_new :: proc(buffer: []u8, nodes: int, edges: int) -> ^Graph {
 	} else {
 		graph.allocator = graph.arena_allocator
 	}
+
+	graph.gutter_edge_distance = gutter_edge_distance
+	graph.gutter_padding = gutter_padding
 
 	graph.nodes = make(
 		[dynamic]Node,
@@ -742,14 +747,14 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 
 		for &gutter in graph.gutters_vertical {
 			gutter.size_px =
-				2 * gutter_padding +
-				gutter_edge_distance * f32(len(gutter.edges))
+				2 * graph.gutter_padding +
+				graph.gutter_edge_distance * f32(len(gutter.edges))
 		}
 
 		for &gutter in graph.gutters_horizontal {
 			gutter.size_px =
-				2 * gutter_padding +
-				gutter_edge_distance * f32(len(gutter.edges))
+				2 * graph.gutter_padding +
+				graph.gutter_edge_distance * f32(len(gutter.edges))
 		}
 	}
 
@@ -842,8 +847,8 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 
 			edge_segment_1_y :=
 				horizontal_gutter.pos +
-				gutter_padding +
-				f32(horizontal_lane) * gutter_edge_distance
+				graph.gutter_padding +
+				f32(horizontal_lane) * graph.gutter_edge_distance
 			// horizontal gutter entrance
 			edge.segments[1] = Segment {
 				type = .Point,
@@ -868,8 +873,8 @@ graph_calculate_layout :: proc(graph: ^Graph) -> (graph_size: V2, ok: bool) {
 
 			edge_segment_2_x :=
 				vertical_gutter.pos +
-				gutter_padding +
-				f32(vertical_lane) * gutter_edge_distance
+				graph.gutter_padding +
+				f32(vertical_lane) * graph.gutter_edge_distance
 			// gutter crossing
 			edge.segments[2] = Segment {
 				type = .Point,
