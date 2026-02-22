@@ -65,6 +65,8 @@ main :: proc() {
 
 	graphs := make([dynamic][2]Graph, 0)
 
+	add_graph_vertical_double_diamond(&graphs)
+	add_graph_double_diamond(&graphs)
 	add_graph_double_pyramid(&graphs)
 	add_graph_diamond(&graphs)
 	add_graph_wide_pyramid(&graphs)
@@ -480,6 +482,186 @@ add_graph_pyramid :: proc(graphs: ^[dynamic][2]Graph) {
 		{from = 2, to = 6},
 		{from = 3, to = 7},
 		{from = 3, to = 8},
+	}
+
+	graph_fill(graphs, nodes[:], edges[:], 400)
+}
+
+add_graph_vertical_double_diamond :: proc(graphs: ^[dynamic][2]Graph) {
+	nodes := [?]Node {
+		// Diamond 1 (layers 0-4)
+		// Layer 0: 1 node
+		{id = 0},
+		// Layer 1: 3 nodes
+		{id = 1},
+		{id = 2},
+		{id = 3},
+		// Layer 2: 5 nodes
+		{id = 4},
+		{id = 5},
+		{id = 6},
+		{id = 7},
+		{id = 8},
+		// Layer 3: 3 nodes
+		{id = 9},
+		{id = 10},
+		{id = 11},
+		// Layer 4: 1 node
+		{id = 12},
+		// Diamond 2 (layers 5-9)
+		// Layer 5: 1 node
+		{id = 13},
+		// Layer 6: 3 nodes
+		{id = 14},
+		{id = 15},
+		{id = 16},
+		// Layer 7: 5 nodes
+		{id = 17},
+		{id = 18},
+		{id = 19},
+		{id = 20},
+		{id = 21},
+		// Layer 8: 3 nodes
+		{id = 22},
+		{id = 23},
+		{id = 24},
+		// Layer 9: 1 node
+		{id = 25},
+	}
+	edges := [?]Edge {
+		// Diamond 1
+		// Layer 0 -> Layer 1
+		{from = 0, to = 1},
+		{from = 0, to = 2},
+		{from = 0, to = 3},
+		// Layer 1 -> Layer 2
+		{from = 1, to = 4},
+		{from = 1, to = 5},
+		{from = 2, to = 6},
+		{from = 3, to = 7},
+		{from = 3, to = 8},
+		// Layer 2 -> Layer 3
+		{from = 4, to = 9},
+		{from = 5, to = 9},
+		{from = 6, to = 10},
+		{from = 7, to = 11},
+		{from = 8, to = 11},
+		// Layer 3 -> Layer 4
+		{from = 9, to = 12},
+		{from = 10, to = 12},
+		{from = 11, to = 12},
+		// Connect diamond 1 bottom to diamond 2 top
+		{from = 12, to = 13},
+		// Diamond 2
+		// Layer 5 -> Layer 6
+		{from = 13, to = 14},
+		{from = 13, to = 15},
+		{from = 13, to = 16},
+		// Layer 6 -> Layer 7
+		{from = 14, to = 17},
+		{from = 14, to = 18},
+		{from = 15, to = 19},
+		{from = 16, to = 20},
+		{from = 16, to = 21},
+		// Layer 7 -> Layer 8
+		{from = 17, to = 22},
+		{from = 18, to = 22},
+		{from = 19, to = 23},
+		{from = 20, to = 24},
+		{from = 21, to = 24},
+		// Layer 8 -> Layer 9
+		{from = 22, to = 25},
+		{from = 23, to = 25},
+		{from = 24, to = 25},
+	}
+
+	graph_fill(graphs, nodes[:], edges[:], 400)
+}
+
+add_graph_double_diamond :: proc(graphs: ^[dynamic][2]Graph) {
+	nodes := [?]Node {
+		// Diamond 1
+		// Layer 0: 1 node
+		{id = 0},
+		// Layer 1: 3 nodes
+		{id = 1},
+		{id = 2},
+		{id = 3},
+		// Layer 2: 5 nodes
+		{id = 4},
+		{id = 5},
+		{id = 6},
+		{id = 7},
+		{id = 8},
+		// Layer 3: 3 nodes
+		{id = 9},
+		{id = 10},
+		{id = 11},
+		// Layer 4: 1 node
+		{id = 12},
+		// Diamond 2
+		// Layer 0: 1 node
+		{id = 13},
+		// Layer 1: 3 nodes
+		{id = 14},
+		{id = 15},
+		{id = 16},
+		// Layer 2: 5 nodes
+		{id = 17},
+		{id = 18},
+		{id = 19},
+		{id = 20},
+		{id = 21},
+		// Layer 3: 3 nodes
+		{id = 22},
+		{id = 23},
+		{id = 24},
+		// Layer 4: 1 node
+		{id = 25},
+	}
+	edges := [?]Edge {
+		// Diamond 1
+		// Layer 0 -> Layer 1
+		{from = 0, to = 1},
+		{from = 0, to = 2},
+		{from = 0, to = 3},
+		// Layer 1 -> Layer 2
+		{from = 1, to = 4},
+		{from = 1, to = 5},
+		{from = 2, to = 6},
+		{from = 3, to = 7},
+		{from = 3, to = 8},
+		// Layer 2 -> Layer 3
+		{from = 4, to = 9},
+		{from = 5, to = 9},
+		{from = 6, to = 10},
+		{from = 7, to = 11},
+		{from = 8, to = 11},
+		// Layer 3 -> Layer 4
+		{from = 9, to = 12},
+		{from = 10, to = 12},
+		{from = 11, to = 12},
+		// Diamond 2
+		// Layer 0 -> Layer 1
+		{from = 13, to = 14},
+		{from = 13, to = 15},
+		{from = 13, to = 16},
+		// Layer 1 -> Layer 2
+		{from = 14, to = 17},
+		{from = 14, to = 18},
+		{from = 15, to = 19},
+		{from = 16, to = 20},
+		{from = 16, to = 21},
+		// Layer 2 -> Layer 3
+		{from = 17, to = 22},
+		{from = 18, to = 22},
+		{from = 19, to = 23},
+		{from = 20, to = 24},
+		{from = 21, to = 24},
+		// Layer 3 -> Layer 4
+		{from = 22, to = 25},
+		{from = 23, to = 25},
+		{from = 24, to = 25},
 	}
 
 	graph_fill(graphs, nodes[:], edges[:], 400)
