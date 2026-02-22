@@ -343,7 +343,10 @@ graph_layout_compute :: proc(g: ^Graph) {
 		less = proc(it: sort.Interface, a, b: int) -> bool {
 			g := (^Graph)(it.collection)
 			nodes := g.nodes[1:]
-			return nodes[a].layer < nodes[b].layer
+			if nodes[a].layer != nodes[b].layer {
+				return nodes[a].layer < nodes[b].layer
+			}
+			return nodes[a].external_id < nodes[b].external_id
 		},
 		collection = g,
 	}
