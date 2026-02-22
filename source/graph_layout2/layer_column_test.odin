@@ -17,6 +17,64 @@ GraphLayoutTest :: struct {
 test_graph_layout :: proc(t: ^testing.T) {
 	tests: []GraphLayoutTest = {
 		{
+			name             = "Diamond graph",
+			nodes            = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
+			edges            = {
+				// Layer 0 -> Layer 1
+				{0, 1},
+				{0, 2},
+				{0, 3},
+				// Layer 1 -> Layer 2
+				{1, 4},
+				{1, 5},
+				{2, 6},
+				{3, 7},
+				{3, 8},
+				// Layer 2 -> Layer 3
+				{4, 9},
+				{5, 9},
+				{6, 10},
+				{7, 11},
+				{8, 11},
+				// Layer 3 -> Layer 4
+				{9, 12},
+				{10, 12},
+				{11, 12},
+			},
+			expected_layers  = {0, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 4},
+			expected_columns = {2, 1, 2, 3, 0, 1, 2, 3, 4, 1, 2, 3, 2},
+		},
+		{
+			name             = "Double pyramid graph",
+			nodes            = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17},
+			edges            = {
+				// Pyramid 1
+				// Layer 0 -> Layer 1
+				{0, 1},
+				{0, 2},
+				{0, 3},
+				// Layer 1 -> Layer 2
+				{1, 4},
+				{1, 5},
+				{2, 6},
+				{3, 7},
+				{3, 8},
+				// Pyramid 2
+				// Layer 0 -> Layer 1
+				{9, 10},
+				{9, 11},
+				{9, 12},
+				// Layer 1 -> Layer 2
+				{10, 13},
+				{10, 14},
+				{11, 15},
+				{12, 16},
+				{12, 17},
+			},
+			expected_layers  = {0, 1, 1, 1, 2, 2, 2, 2, 2, 0, 1, 1, 1, 2, 2, 2, 2, 2},
+			expected_columns = {2, 1, 2, 3, 0, 1, 2, 3, 4, 7, 6, 7, 8, 5, 6, 7, 8, 9},
+		},
+		{
 			name             = "Pyramid graph",
 			nodes            = {0, 1, 2, 3, 4, 5, 6, 7, 8},
 			edges            = {
