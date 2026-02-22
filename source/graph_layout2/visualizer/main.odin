@@ -19,6 +19,25 @@ DebugDrawSectionOrigin := DEBUG_SECTION_START
 DEBUG_PADDING :: 5
 DebugDrawMaxY: f32 = 0
 
+DebugDrawCmd :: union {
+	DebugDrawRect,
+	DebugDrawSection,
+}
+
+DebugDrawRect :: struct {
+	upper_left: V2,
+	size:       V2,
+	color:      [4]u8,
+	text:       string,
+}
+
+DebugDrawSection :: struct {
+	origin: V2,
+	name:   string,
+}
+
+debug_draw_cmds: [dynamic]DebugDrawCmd
+
 Node :: struct {
 	id:  int,
 	rec: rl.Rectangle,
@@ -99,7 +118,6 @@ main :: proc() {
 		DebugDrawMaxY = 0
 
 		if run_gl_layout {
-			run_gl_layout = false
 			g := graph_1
 			gl_buffer := runtime.make_aligned([]u8, 64 * 1024 * 1024, 64)
 			gl_graph := gl.graph_new(
@@ -179,7 +197,9 @@ main :: proc() {
 			}
 		}
 
-		{
+		if run_gl_layout {
+			clear(&debug_draw_cmds)
+
 			debug_draw_rect :: proc(
 				pos: V2,
 				size: V2,
@@ -188,13 +208,17 @@ main :: proc() {
 			) {
 				orig := DebugDrawSectionOrigin
 				upper_left := orig + pos + DEBUG_PADDING
-				rl.DrawRectangleV(upper_left, size, transmute(rl.Color)color)
-				rl.DrawText(
-					strings.clone_to_cstring(text),
-					i32(upper_left.x) + 5,
-					i32(upper_left.y) + 5,
-					20,
-					rl.WHITE,
+
+				append(
+					&debug_draw_cmds,
+					DebugDrawCmd(
+						DebugDrawRect {
+							upper_left = upper_left,
+							size = size,
+							color = color,
+							text = strings.clone(text),
+						},
+					),
 				)
 
 				DebugDrawMaxY = max(
@@ -208,16 +232,16 @@ main :: proc() {
 					DebugDrawSectionOrigin +
 					V2{0, DebugDrawMaxY + DEBUG_PADDING}
 				DebugDrawMaxY = 0
-				orig := DebugDrawSectionOrigin
 
-				rl.DrawText(
-					strings.clone_to_cstring(name),
-					i32(orig.x),
-					i32(orig.y - 30),
-					30,
-					rl.BLACK,
+				append(
+					&debug_draw_cmds,
+					DebugDrawCmd(
+						DebugDrawSection {
+							origin = DebugDrawSectionOrigin,
+							name = strings.clone(name),
+						},
+					),
 				)
-				rl.DrawLineV(orig, orig + V2{1200, 0}, rl.BLACK)
 			}
 
 			g := graph_2
@@ -304,7 +328,10 @@ main :: proc() {
 			}
 		}
 
+		run_gl_layout = false
+
 		draw(graph_pair)
+		debug_draw_replay()
 		rl.EndDrawing()
 	}
 }
@@ -340,6 +367,31 @@ draw_graph :: proc(g: ^Graph, start_width: f32 = 0) {
 			}
 			rl.DrawLineV(last, segment.end, color)
 			last = segment.end
+		}
+	}
+}
+
+debug_draw_replay :: proc() {
+	for cmd in debug_draw_cmds {
+		switch c in cmd {
+		case DebugDrawRect:
+			rl.DrawRectangleV(c.upper_left, c.size, transmute(rl.Color)c.color)
+			rl.DrawText(
+				strings.clone_to_cstring(c.text),
+				i32(c.upper_left.x) + 5,
+				i32(c.upper_left.y) + 5,
+				20,
+				rl.WHITE,
+			)
+		case DebugDrawSection:
+			rl.DrawText(
+				strings.clone_to_cstring(c.name),
+				i32(c.origin.x),
+				i32(c.origin.y - 30),
+				30,
+				rl.BLACK,
+			)
+			rl.DrawLineV(c.origin, c.origin + V2{1200, 0}, rl.BLACK)
 		}
 	}
 }
