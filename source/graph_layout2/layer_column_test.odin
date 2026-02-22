@@ -55,8 +55,8 @@ test_graph_layout :: proc(t: ^testing.T) {
 		{
 			name             = "Wide pyramid",
 			nodes            = {
-				0,
 				1,
+				0,
 				2,
 				3,
 				4,
@@ -75,14 +75,14 @@ test_graph_layout :: proc(t: ^testing.T) {
 			},
 			edges            = {
 				// Layer 0 -> Layer 1
-				{0, 1},
-				{0, 2},
-				{0, 3},
-				{0, 4},
-				{0, 5},
+				{1, 0},
+				{1, 2},
+				{1, 3},
+				{1, 4},
+				{1, 5},
 				// Layer 1 -> Layer 2
-				{1, 6},
-				{1, 7},
+				{0, 6},
+				{0, 7},
 				{2, 8},
 				{2, 9},
 				{3, 10},
