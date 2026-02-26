@@ -83,14 +83,14 @@ main :: proc() {
 	max_node_size := V2{50, 50}
 
 	graphs := make([dynamic][2]Graph, 0)
-
+	add_graph_pyramid(&graphs)
 	add_graph_vertical_double_diamond(&graphs)
+	add_graph_3x3_full(&graphs)
 	add_graph_double_diamond(&graphs)
 	add_graph_double_pyramid(&graphs)
 	add_graph_diamond(&graphs)
 	add_graph_wide_pyramid(&graphs)
 	add_graph_inverted_pyramid(&graphs)
-	add_graph_pyramid(&graphs)
 	add_graph3(&graphs)
 	add_graph1(&graphs)
 	add_graph2(&graphs)
@@ -627,7 +627,7 @@ add_graph_vertical_double_diamond :: proc(graphs: ^[dynamic][2]Graph) {
 		{from = 24, to = 25},
 	}
 
-	graph_fill(graphs, nodes[:], edges[:], 400)
+	graph_fill(graphs, nodes[:], edges[:], 800)
 }
 
 add_graph_double_diamond :: proc(graphs: ^[dynamic][2]Graph) {
@@ -865,6 +865,44 @@ add_graph_wide_pyramid :: proc(graphs: ^[dynamic][2]Graph) {
 		{from = 5, to = 14},
 		{from = 5, to = 15},
 		{from = 5, to = 16},
+	}
+
+	graph_fill(graphs, nodes[:], edges[:], 400)
+}
+
+add_graph_3x3_full :: proc(graphs: ^[dynamic][2]Graph) {
+	nodes := [?]Node {
+		{id = 1},
+		{id = 2},
+		{id = 3},
+		{id = 4},
+		{id = 5},
+		{id = 6},
+		{id = 7},
+		{id = 8},
+		{id = 9},
+	}
+	edges := [?]Edge {
+		// layer 1 -> 2
+		{from = 1, to = 4},
+		{from = 1, to = 5},
+		{from = 1, to = 6},
+		{from = 2, to = 4},
+		{from = 2, to = 5},
+		{from = 2, to = 6},
+		{from = 3, to = 4},
+		{from = 3, to = 5},
+		{from = 3, to = 6},
+		// layer 2 -> 3
+		{from = 4, to = 7},
+		{from = 4, to = 8},
+		{from = 4, to = 9},
+		{from = 5, to = 7},
+		{from = 5, to = 8},
+		{from = 5, to = 9},
+		{from = 6, to = 7},
+		{from = 6, to = 8},
+		{from = 6, to = 9},
 	}
 
 	graph_fill(graphs, nodes[:], edges[:], 400)
