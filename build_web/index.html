@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+
+	<title>DA Viewer</title>
+	<meta name="title" content="DA Viewer">
+	<meta name="description" content="View and analyze DA files">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+	<style>
+		body { 
+			margin: 0px; 
+			overflow: hidden; 
+			background-color: black;
+		}
+		canvas.game_canvas { 
+			border: 0px none; 
+			background-color: black;
+			padding-left: 0;
+			padding-right: 0;
+			margin-left: auto;
+			margin-right: auto;
+			display: block;
+			width: 100vw !important;
+			height: 100vh !important;
+		}
+		html {
+			-ms-text-size-adjust: none;
+			-webkit-text-size-adjust: none;
+			text-size-adjust: none;
+		}
+	</style>
+</head>
+<body>
+	<canvas class="game_canvas" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1" onmousedown="event.target.focus()"></canvas>
+	<script type="text/javascript" src="odin.js"></script>
+	<script type="text/javascript" src="app_hotkeys.js"></script>
+	<script>
+		// Common function for setting canvas size with proper pixel ratio
+		function setCanvasSize() {
+			const canvas = document.getElementById('canvas');
+			const pixelRatio = window.devicePixelRatio || 1;
+			
+			// Get the viewport dimensions
+			const width = window.innerWidth;
+			const height = window.innerHeight;
+			
+			// Set physical size of canvas
+			canvas.width = width * pixelRatio;
+			canvas.height = height * pixelRatio;
+			
+			// Set display size
+			canvas.style.width = width + 'px';
+			canvas.style.height = height + 'px';
+			
+			console.log(`Canvas size set to ${canvas.width}x${canvas.height} (pixel ratio: ${pixelRatio})`);
+			
+			// Return the physical dimensions
+			return { width: canvas.width, height: canvas.height };
+		}
+		
+		// Set canvas size immediately, before any other code runs
+		setCanvasSize();
+	
+		var key_input_stack = [];
+		var odinMemoryInterface = new odin.WasmMemoryInterface();
+		odinMemoryInterface.setIntSize(4);
+		var odinImports = odin.setupDefaultImports(odinMemoryInterface);
+		
+		// The Module is used as configuration for emscripten.
+		var Module = {
+			// This is called by emscripten when it starts up.
+			instantiateWasm: (imports, successCallback) => {
+				const newImports = {
+					...odinImports,
+					...imports
+				};
+
+				newImports.env.js_get_key = function(ptr) {
+					console.log('js_get_key called, stack:', key_input_stack.length > 0 ? key_input_stack[0] : 0);
+					return key_input_stack.length > 0 ? key_input_stack.shift() : 0;
+				};
+				
+				newImports.env.js_paste_from_clipboard = function(ptr) {
+					// Ensure a user gesture triggers this function!
+					navigator.clipboard.readText().then(function(text) {
+						// Convert text to UTF-8 bytes
+						if (text.length >= 100*1024) {
+							console.error("Text too long for clipboard paste callback");
+							return; // Prevent buffer overflow
+						}
+						const encoder = new TextEncoder();
+						const utf8 = encoder.encode(text);
+
+						// Write bytes to WASM memory
+						const wasmMemory = odinMemoryInterface.memory;
+						const memView = new Uint8Array(wasmMemory.buffer, ptr, utf8.length);
+						memView.set(utf8);
+
+						// Odin callback, must be exported (e.g., @(export, link_name="paste_callback"))
+						const paste_callback = odinMemoryInterface.exports.paste_callback;
+						paste_callback(utf8.length);
+					}).catch(function(err) {
+						console.error("Clipboard paste error:", err);
+					});
+				};
+
+				return WebAssembly.instantiateStreaming(fetch("index.wasm"), newImports).then(function(output) {
+					var e = output.instance.exports;
+					odinMemoryInterface.setExports(e);
+					odinMemoryInterface.setMemory(e.memory);
+					return successCallback(output.instance);
+				});
+			},
+			// This happens a bit after `instantiateWasm`, when everything is
+			// done setting up. At that point we can run code.
+			onRuntimeInitialized: () => {
+				var e = wasmExports;
+
+				// Set canvas size explicitly to ensure it's at the right resolution
+				function send_resize() {
+					const dims = setCanvasSize();
+					e.web_window_size_changed(dims.width, dims.height);
+				}
+				
+				// Make sure canvas is sized correctly before initializing Odin code
+				setCanvasSize();
+
+				// Calls any procedure marked with @init
+				e._start();
+
+				// See source/main_web/main_web.odin for main_start,
+				// main_update and main_end.
+				e.main_start();
+				
+				// Send initial resize with the correct dimensions
+				send_resize();
+
+				// Handle window resizing
+				window.addEventListener('resize', send_resize, true);
+				
+				// Handle zoom by watching for changes to devicePixelRatio
+				let lastPixelRatio = window.devicePixelRatio;
+				setInterval(() => {
+					if (window.devicePixelRatio !== lastPixelRatio) {
+						lastPixelRatio = window.devicePixelRatio;
+						send_resize();
+					}
+				}, 250); // Check every 250ms
+
+				// Track if we're in text input mode
+				let inTextInputMode = false;
+				
+				// Function to query Odin for text input focus state
+				function isTextInputFocused() {
+					// Call the exported Odin function
+					// This function returns 1 if text input is focused, 0 otherwise
+					try {
+						if (typeof odinMemoryInterface.exports.web_is_text_input_focused === 'function') {
+							return odinMemoryInterface.exports.web_is_text_input_focused() === 1;
+						}
+					} catch (e) {
+						console.error("Error checking text input focus:", e);
+					}
+					return false;
+				}
+				
+				// Keydown event handling
+				window.addEventListener('keydown', e => {
+					// Update text input mode by querying Odin directly
+					inTextInputMode = isTextInputFocused();
+					
+					console.log('Keydown event:', e.key, 'Ctrl:', e.ctrlKey, 'Alt:', e.altKey, 'Shift:', e.shiftKey, 'TextMode:', inTextInputMode);
+					
+					// If we're in text input mode and this is a single character without modifiers
+					// Then always allow it through to the text input handler regardless of hotkey status
+					if (inTextInputMode && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+						e.preventDefault(); // Prevent default browser behavior
+						console.log('Text character captured (in text mode):', e.key);
+						for (const cp of e.key) key_input_stack.push(cp.codePointAt(0));
+						return;
+					}
+					
+					// For other cases, check if this is an app hotkey
+					if (matchesHotkey(e, appHotkeys)) {
+						e.preventDefault(); // Prevent default browser behavior
+						console.log('App hotkey captured:', e.key);
+						return;
+					}
+					
+					// Handle regular text input (single printable characters)
+					if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+						e.preventDefault(); // Prevent default browser behavior
+						console.log('Text character captured:', e.key);
+						for (const cp of e.key) key_input_stack.push(cp.codePointAt(0));
+						return;
+					}
+					
+					// Let browser handle all other key combinations
+					console.log('Letting browser handle:', e.key);
+				});
+				
+				window.addEventListener('input', e => {
+					console.log('Input event:', e.data);
+					if (e.data) for (const cp of e.data) key_input_stack.push(cp.codePointAt(0));
+				});
+
+				// This can probably be done better: Ideally we'd feed the
+				// initial size to `main_start`. But there seems to be a
+				// race condition. `canvas` doesn't have it's correct size yet.
+				// No need for timeout as we now handle sizing explicitly
+
+				// Runs the "main loop".
+				function do_main_update() {
+					if (!e.main_update()) {
+						e.main_end();
+
+						// Calls procedures marked with @fini
+						e._end();
+						return;
+					}
+					window.requestAnimationFrame(do_main_update);
+				}
+
+				window.requestAnimationFrame(do_main_update);
+			},
+			print: (function() {
+				var element = document.getElementById("output");
+				if (element) element.value = ''; // clear browser cache
+				return function(text) {
+					if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+					console.log(text);
+					if (element) {
+					  element.value += text + "\n";
+					  element.scrollTop = element.scrollHeight; // focus on bottom
+					}
+				};
+			})(),
+			canvas: (function() {
+				return document.getElementById("canvas");
+			})()
+		};
+	</script>
+
+	<!-- Emscripten injects its javascript here -->
+	<script async type="text/javascript" src="index.js"></script>
+</body>
+</html>
